@@ -1,6 +1,6 @@
 @tool
-class_name DotLogFormatSplunk
-extends DotLogFormat
+class_name GSLogFormatSplunk
+extends GSLogFormat
 
 ## Splunk's HTTP Event Collector.
 ## The header is [code]Authorization: Splunk <token>[/code], not Bearer (a 401 "Token is required").
@@ -37,7 +37,7 @@ func build(events: Array, context: Dictionary) -> PackedByteArray:
 
 	for event: Dictionary in events:
 		var envelope: Dictionary = {
-			"time": DotLogEvent.time_sec(event),
+			"time": GSLogEvent.time_sec(event),
 			"source": source,
 			"sourcetype": sourcetype,
 			"event": _event_body(event, context),
@@ -63,11 +63,11 @@ func _event_body(event: Dictionary, context: Dictionary) -> Dictionary:
 	for k: Variant in context:
 		if str(k) == "host":
 			continue  # already in the envelope, where Splunk indexes it
-		body[str(k)] = DotLogEvent.json_value(context[k])
+		body[str(k)] = GSLogEvent.json_value(context[k])
 
 	var fields: Dictionary = event.get("fields", {})
 	for k: Variant in fields:
-		body[str(k)] = DotLogEvent.json_value(fields[k])
+		body[str(k)] = GSLogEvent.json_value(fields[k])
 
 	return body
 
@@ -82,7 +82,7 @@ func max_bytes() -> int:
 	return 4 * 1024 * 1024
 
 
-func interpret(response: Dictionary) -> DotResult:
+func interpret(response: Dictionary) -> GSResult:
 	var status: int = int(response.get("status", 0))
 	var text: String = String(response.get("body_text", ""))
 
@@ -94,18 +94,18 @@ func interpret(response: Dictionary) -> DotResult:
 		if typeof(parsed) == TYPE_DICTIONARY:
 			var code: int = int((parsed as Dictionary).get("code", 0))
 			if code != 0:
-				return DotResult.fail(
-					DotError.CODE_INVALID,
+				return GSResult.fail(
+					GSError.CODE_INVALID,
 					"The event collector reported code %d." % code,
 					str((parsed as Dictionary).get("text", ""))
 				)
-		return DotResult.success(null)
+		return GSResult.success(null)
 
 	if status == 403 or status == 401:
-		return DotResult.fail(
-			DotError.CODE_AUTH,
+		return GSResult.fail(
+			GSError.CODE_AUTH,
 			"The event collector refused the token.",
 			"check the token and that `Authorization: Splunk` is the scheme in use"
 		)
 
-	return DotResult.failure(DotError.from_http(status, text))
+	return GSResult.failure(GSError.from_http(status, text))

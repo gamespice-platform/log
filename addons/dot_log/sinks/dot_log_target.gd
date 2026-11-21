@@ -1,14 +1,14 @@
 @tool
-class_name DotLogTarget
+class_name GSLogTarget
 extends Resource
 
-## Somewhere a log record goes. One of these per destination, owned by [DotLogRouter].
+## Somewhere a log record goes. One of these per destination, owned by [GSLogRouter].
 ## [method write] must not block, must not log (reentrancy), must not mutate the event; a failure is survivable and visible through [method health].
 ## A [Resource] so logging can be built in the inspector and saved as a [code].tres[/code].
 
 # No log channel, and there must never be one: a target runs inside a log call, and a
 # target that logged would re-enter the router (the second rule above). Its failures are
-# returned and reported through health(), which DotLogRouter surfaces.
+# returned and reported through health(), which GSLogRouter surfaces.
 
 ## Short name, for [method describe] and for the console listing. Unique within a router.
 @export var target_name: String = "target"
@@ -17,9 +17,9 @@ extends Resource
 ## and its counters, which is what makes it useful as a runtime switch.
 @export var enabled: bool = true
 
-## What this target accepts, over and above [DotLog]'s own threshold.
+## What this target accepts, over and above [GSLog]'s own threshold.
 ## Null means everything; this is where "file keeps DEBUG, collector gets WARN" is expressed.
-@export var gate: DotLogGate = null
+@export var gate: GSLogGate = null
 
 var _written: int = 0
 var _failed: int = 0
@@ -30,9 +30,9 @@ var _opened: bool = false
 
 ## Prepares the destination: opens the file, resolves the socket, creates the table.
 ## Failing is not fatal to the router; this target is left closed and says so.
-func open() -> DotResult:
+func open() -> GSResult:
 	_opened = true
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 ## Releases whatever [method open] acquired. Must be safe to call twice.
@@ -53,7 +53,7 @@ func accepts(event: Dictionary) -> bool:
 	return true
 
 
-## Takes one event. Must return promptly and must not call [DotLog].
+## Takes one event. Must return promptly and must not call [GSLog].
 ## The base implementation only counts; a queueing subclass can call [code]super(event)[/code].
 func write(event: Dictionary) -> void:
 	_written += 1
@@ -61,8 +61,8 @@ func write(event: Dictionary) -> void:
 
 ## Sends or persists whatever [method write] has queued.
 ## May be a coroutine (the router awaits it). Returns the number of records dealt with.
-func flush() -> DotResult:
-	return DotResult.success(0)
+func flush() -> GSResult:
+	return GSResult.success(0)
 
 
 ## Whether [method flush] does real work, so the router can skip an await per tick.
@@ -85,7 +85,7 @@ func failed() -> int:
 
 
 ## Records a failure for [method health]. Never logs: see the rules above.
-func note_failure(res: DotResult) -> void:
+func note_failure(res: GSResult) -> void:
 	_failed += 1
 	_last_error_ms = Time.get_ticks_msec()
 	if res != null and res.error != null:

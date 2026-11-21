@@ -1,6 +1,6 @@
 @tool
-class_name DotLogTargetMemory
-extends DotLogTarget
+class_name GSLogTargetMemory
+extends GSLogTarget
 
 ## Keeps the last N records in memory, and nothing else.
 ## A ring on purpose: serves the in-game console, bug reports and Sentry breadcrumbs, and a client left overnight must not grow.
@@ -14,7 +14,7 @@ const SELF_CHANNEL := "log.memory"
 
 ## Records below this level are not kept even if the gate passed them.
 ## Distinct from the gate so a console can hold DEBUG while a bug-report ring holds INFO and above.
-@export var min_level: DotLog.Level = DotLog.Level.TRACE
+@export var min_level: GSLog.Level = GSLog.Level.TRACE
 
 var _ring: Array[Dictionary] = []
 var _discarded: int = 0
@@ -26,9 +26,9 @@ func _init(p_capacity: int = 0) -> void:
 		capacity = p_capacity
 
 
-func open() -> DotResult:
+func open() -> GSResult:
 	_opened = true
-	return DotResult.success(capacity)
+	return GSResult.success(capacity)
 
 
 func close() -> void:
@@ -38,7 +38,7 @@ func close() -> void:
 
 
 func write(event: Dictionary) -> void:
-	if int(event.get("level", DotLog.Level.INFO)) < min_level:
+	if int(event.get("level", GSLog.Level.INFO)) < min_level:
 		return
 
 	super(event)
@@ -63,7 +63,7 @@ func tail(count: int = 0) -> Array[Dictionary]:
 func matching(
 	needle: String = "",
 	channel: String = "",
-	level: int = DotLog.Level.TRACE,
+	level: int = GSLog.Level.TRACE,
 	limit: int = 0
 ) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -72,7 +72,7 @@ func matching(
 	for event: Dictionary in _ring:
 		if int(event.get("level", 2)) < level:
 			continue
-		if channel != "" and String(event.get("channel", "")) != DotLog.display_channel(channel):
+		if channel != "" and String(event.get("channel", "")) != GSLog.display_channel(channel):
 			continue
 		if lower != "" and not _contains(event, lower):
 			continue
@@ -97,7 +97,7 @@ func _contains(event: Dictionary, lower_needle: String) -> bool:
 func to_text(count: int = 0) -> String:
 	var lines: PackedStringArray = PackedStringArray()
 	for event: Dictionary in tail(count):
-		lines.append(DotLogEvent.text_line(event))
+		lines.append(GSLogEvent.text_line(event))
 	return "\n".join(lines)
 
 
@@ -106,11 +106,11 @@ func breadcrumbs(count: int = 0) -> Array:
 	var out: Array = []
 	for event: Dictionary in tail(count):
 		out.append({
-			"timestamp": DotLogEvent.time_sec(event),
+			"timestamp": GSLogEvent.time_sec(event),
 			"level": String(event.get("severity", "info")),
 			"category": String(event.get("channel", "")),
 			"message": String(event.get("message", "")),
-			"data": DotLogEvent.json_fields(event.get("fields", {})),
+			"data": GSLogEvent.json_fields(event.get("fields", {})),
 		})
 	return out
 

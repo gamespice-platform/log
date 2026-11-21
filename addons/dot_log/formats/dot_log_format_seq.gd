@@ -1,10 +1,10 @@
 @tool
-class_name DotLogFormatSeq
-extends DotLogFormat
+class_name GSLogFormatSeq
+extends GSLogFormat
 
 ## Seq, in the compact log event format (CLEF): newline-delimited JSON with reserved [code]@t[/code], [code]@l[/code], [code]@m[/code]/[code]@mt[/code] and [code]@x[/code] keys.
 ## Info-level records omit [code]@l[/code] (absent means Information).
-## Seq groups by message template, which matches [DotLog]'s constant message plus fields, so nothing is parsed back out.
+## Seq groups by message template, which matches [GSLog]'s constant message plus fields, so nothing is parsed back out.
 
 ## Seq's level names, which are its own.
 const SEQ_LEVELS: Array[String] = [
@@ -39,10 +39,10 @@ func build(events: Array, context: Dictionary) -> PackedByteArray:
 	var lines: PackedStringArray = PackedStringArray()
 
 	for event: Dictionary in events:
-		var row: Dictionary = {"@t": DotLogEvent.iso8601(event)}
+		var row: Dictionary = {"@t": GSLogEvent.iso8601(event)}
 
-		var level: int = int(event.get("level", DotLog.Level.INFO))
-		if level != DotLog.Level.INFO:
+		var level: int = int(event.get("level", GSLog.Level.INFO))
+		if level != GSLog.Level.INFO:
 			# Information is CLEF's default and sending it is redundant. Not a
 			# micro-optimisation: it is how the format is specified, and a reader that
 			# treats an explicit level differently from an absent one does exist.
@@ -58,10 +58,10 @@ func build(events: Array, context: Dictionary) -> PackedByteArray:
 		row["Channel"] = String(event.get("channel", ""))
 
 		for k: Variant in context:
-			row[_property_name(str(k))] = DotLogEvent.json_value(context[k])
+			row[_property_name(str(k))] = GSLogEvent.json_value(context[k])
 
 		for k: Variant in fields:
-			row[_property_name(str(k))] = DotLogEvent.json_value(fields[k])
+			row[_property_name(str(k))] = GSLogEvent.json_value(fields[k])
 
 		lines.append(JSON.stringify(row))
 
@@ -69,7 +69,7 @@ func build(events: Array, context: Dictionary) -> PackedByteArray:
 
 
 ## The message with one [code]{Field}[/code] hole appended per field.
-## Appended, not substituted: a [DotLog] message is prose with no holes, so the fields are stated after it and it groups on the prose.
+## Appended, not substituted: a [GSLog] message is prose with no holes, so the fields are stated after it and it groups on the prose.
 func _template_for(message: String, fields: Dictionary) -> String:
 	var holes: PackedStringArray = PackedStringArray()
 	for k: Variant in fields:
@@ -101,20 +101,20 @@ func max_bytes() -> int:
 	return 8 * 1024 * 1024
 
 
-func interpret(response: Dictionary) -> DotResult:
+func interpret(response: Dictionary) -> GSResult:
 	var status: int = int(response.get("status", 0))
 	if status >= 200 and status < 300:
-		return DotResult.success(null)
+		return GSResult.success(null)
 
 	if status == 400:
 		# Seq answers 400 with the offending line's index, which is worth keeping: it
 		# is nearly always one record with a field the ingestion rules reject.
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"Seq refused the batch.",
 			String(response.get("body_text", "")).substr(0, 512)
 		)
 
-	return DotResult.failure(
-		DotError.from_http(status, String(response.get("body_text", "")))
+	return GSResult.failure(
+		GSError.from_http(status, String(response.get("body_text", "")))
 	)

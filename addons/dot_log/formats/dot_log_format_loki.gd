@@ -1,6 +1,6 @@
 @tool
-class_name DotLogFormatLoki
-extends DotLogFormat
+class_name GSLogFormatLoki
+extends GSLogFormat
 
 ## Grafana Loki's push API.
 ## Loki indexes labels, so cardinality is the hazard: service, environment, host, level and channel are the only labels.
@@ -63,7 +63,7 @@ func build(events: Array, context: Dictionary) -> PackedByteArray:
 			streams[key] = {"stream": labels, "values": []}
 
 		var entry: Array = [
-			DotLogEvent.time_ns(event),
+			GSLogEvent.time_ns(event),
 			_line_for(event),
 		]
 		(streams[key]["values"] as Array).append(entry)
@@ -118,7 +118,7 @@ func _line_for(event: Dictionary) -> String:
 	var body: Dictionary = {"message": String(event.get("message", ""))}
 	var fields: Dictionary = event.get("fields", {})
 	for k: Variant in fields:
-		body[str(k)] = DotLogEvent.json_value(fields[k])
+		body[str(k)] = GSLogEvent.json_value(fields[k])
 	return JSON.stringify(body)
 
 
@@ -132,21 +132,21 @@ func max_bytes() -> int:
 	return 4 * 1024 * 1024
 
 
-func interpret(response: Dictionary) -> DotResult:
+func interpret(response: Dictionary) -> GSResult:
 	var status: int = int(response.get("status", 0))
 	if status == 204 or (status >= 200 and status < 300):
-		return DotResult.success(null)
+		return GSResult.success(null)
 
 	if status == 400:
 		# Loki's 400s are structural (bad label, out of order, too old), so retrying the same
 		# body cannot help. Report invalid so the target drops the batch instead of blocking
 		# the queue behind it.
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"Loki refused the batch.",
 			String(response.get("body_text", "")).substr(0, 512)
 		)
 
-	return DotResult.failure(
-		DotError.from_http(status, String(response.get("body_text", "")))
+	return GSResult.failure(
+		GSError.from_http(status, String(response.get("body_text", "")))
 	)

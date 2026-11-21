@@ -1,4 +1,4 @@
-class_name DotLogCommands
+class_name GSLogCommands
 extends RefCounted
 
 ## The `log` command: what the logger is doing, and what it has been saying.
@@ -14,13 +14,13 @@ const SUBCOMMANDS: Array[String] = [
 ## Default number of lines `tail` returns. A console scrollback is not a pager.
 const DEFAULT_TAIL := 20
 
-var router: DotLogRouter = null
+var router: GSLogRouter = null
 
 ## Where `tail` and `grep` read from. Resolved from the router when not set.
-var memory: DotLogTargetMemory = null
+var memory: GSLogTargetMemory = null
 
 
-func _init(p_router: DotLogRouter = null) -> void:
+func _init(p_router: GSLogRouter = null) -> void:
 	router = p_router
 
 
@@ -59,8 +59,8 @@ func complete(partial: String, limit: int = 24) -> PackedStringArray:
 	elif position == 2 and words[1].to_lower() in ["level", "test"]:
 		# The level names, which is the completion that actually saves typing: nobody
 		# remembers whether this logger spells it `warn` or `warning`.
-		for i: int in range(DotLog.LEVEL_NAMES.size()):
-			candidates.append(DotLog.LEVEL_NAMES[i].to_lower())
+		for i: int in range(GSLog.LEVEL_NAMES.size()):
+			candidates.append(GSLog.LEVEL_NAMES[i].to_lower())
 
 	for c: String in candidates:
 		if c.begins_with(prefix):
@@ -70,10 +70,10 @@ func complete(partial: String, limit: int = 24) -> PackedStringArray:
 	return out
 
 
-func execute(line: String) -> DotResult:
+func execute(line: String) -> GSResult:
 	var words: PackedStringArray = line.strip_edges().split(" ", false)
 	if words.is_empty() or words[0].to_lower() != "log":
-		return DotResult.fail(DotError.CODE_INVALID, "not a log command")
+		return GSResult.fail(GSError.CODE_INVALID, "not a log command")
 
 	var sub: String = words[1].to_lower() if words.size() > 1 else "status"
 	var args: PackedStringArray = words.slice(2)
@@ -96,31 +96,31 @@ func execute(line: String) -> DotResult:
 		"test":
 			return _test(args)
 		_:
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"Unknown: log %s" % sub,
 				"one of: " + ", ".join(SUBCOMMANDS)
 			)
 
 
-func _status() -> DotResult:
+func _status() -> GSResult:
 	if router == null:
-		return DotResult.success(
+		return GSResult.success(
 			"No log router. Records are going to stdout and nowhere else."
 		)
-	return DotResult.success("\n".join(router.describe_lines()))
+	return GSResult.success("\n".join(router.describe_lines()))
 
 
-func _targets() -> DotResult:
+func _targets() -> GSResult:
 	if router == null:
-		return DotResult.fail(DotError.CODE_STATE, "No log router.")
+		return GSResult.fail(GSError.CODE_STATE, "No log router.")
 
 	var lines: PackedStringArray = PackedStringArray()
 	lines.append("%-12s %-6s %-8s %8s %8s %8s  %s" % [
 		"target", "open", "state", "written", "pending", "failed", "detail"
 	])
 
-	for target: DotLogTarget in router.targets:
+	for target: GSLogTarget in router.targets:
 		var health: Dictionary = target.health()
 		lines.append("%-12s %-6s %-8s %8d %8d %8d  %s" % [
 			target.target_name,
@@ -132,16 +132,16 @@ func _targets() -> DotResult:
 			str(health["last_error"]),
 		])
 
-	return DotResult.success("\n".join(lines))
+	return GSResult.success("\n".join(lines))
 
 
-func _tail(args: PackedStringArray) -> DotResult:
-	var ring: DotLogTargetMemory = _memory()
+func _tail(args: PackedStringArray) -> GSResult:
+	var ring: GSLogTargetMemory = _memory()
 	if ring == null:
-		return DotResult.fail(
-			DotError.CODE_STATE,
+		return GSResult.fail(
+			GSError.CODE_STATE,
 			"There is no memory target to read back.",
-			"add a DotLogTargetMemory to the router"
+			"add a GSLogTargetMemory to the router"
 		)
 
 	var count: int = DEFAULT_TAIL
@@ -150,21 +150,21 @@ func _tail(args: PackedStringArray) -> DotResult:
 
 	var events: Array[Dictionary] = ring.tail(count)
 	if events.is_empty():
-		return DotResult.success("(nothing recorded yet)")
+		return GSResult.success("(nothing recorded yet)")
 
 	var lines: PackedStringArray = PackedStringArray()
 	for event: Dictionary in events:
-		lines.append(DotLogEvent.text_line(event))
-	return DotResult.success("\n".join(lines))
+		lines.append(GSLogEvent.text_line(event))
+	return GSResult.success("\n".join(lines))
 
 
-func _grep(args: PackedStringArray) -> DotResult:
-	var ring: DotLogTargetMemory = _memory()
+func _grep(args: PackedStringArray) -> GSResult:
+	var ring: GSLogTargetMemory = _memory()
 	if ring == null:
-		return DotResult.fail(DotError.CODE_STATE, "There is no memory target to search.")
+		return GSResult.fail(GSError.CODE_STATE, "There is no memory target to search.")
 
 	if args.is_empty():
-		return DotResult.fail(DotError.CODE_INVALID, "log grep <text> [count]")
+		return GSResult.fail(GSError.CODE_INVALID, "log grep <text> [count]")
 
 	var count: int = DEFAULT_TAIL
 	var needle: String = " ".join(args)
@@ -172,44 +172,44 @@ func _grep(args: PackedStringArray) -> DotResult:
 		count = maxi(1, args[args.size() - 1].to_int())
 		needle = " ".join(args.slice(0, args.size() - 1))
 
-	var events: Array[Dictionary] = ring.matching(needle, "", DotLog.Level.TRACE, count)
+	var events: Array[Dictionary] = ring.matching(needle, "", GSLog.Level.TRACE, count)
 	if events.is_empty():
-		return DotResult.success("(no match for '%s' in the last %d records)" % [
+		return GSResult.success("(no match for '%s' in the last %d records)" % [
 			needle, ring.size()
 		])
 
 	var lines: PackedStringArray = PackedStringArray()
 	for event: Dictionary in events:
-		lines.append(DotLogEvent.text_line(event))
-	return DotResult.success("\n".join(lines))
+		lines.append(GSLogEvent.text_line(event))
+	return GSResult.success("\n".join(lines))
 
 
-func _level(args: PackedStringArray) -> DotResult:
+func _level(args: PackedStringArray) -> GSResult:
 	if args.is_empty():
 		var lines: PackedStringArray = PackedStringArray()
-		lines.append("level %s" % DotLog.level_name(DotLog.get_level()))
-		for i: int in range(DotLog.Level.TRACE, DotLog.Level.OFF + 1):
+		lines.append("level %s" % GSLog.level_name(GSLog.get_level()))
+		for i: int in range(GSLog.Level.TRACE, GSLog.Level.OFF + 1):
 			lines.append("  %-5s %s" % [
-				DotLog.LEVEL_NAMES[i], _level_meaning(i)
+				GSLog.LEVEL_NAMES[i], _level_meaning(i)
 			])
-		return DotResult.success("\n".join(lines))
+		return GSResult.success("\n".join(lines))
 
-	var parsed: int = DotLog.parse_level(args[0])
+	var parsed: int = GSLog.parse_level(args[0])
 	if parsed < 0:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"Unknown level '%s'." % args[0],
-			", ".join(DotLog.LEVEL_NAMES).to_lower()
+			", ".join(GSLog.LEVEL_NAMES).to_lower()
 		)
 
-	DotLog.set_level(parsed)
-	return DotResult.success("level is now %s" % DotLog.level_name(parsed))
+	GSLog.set_level(parsed)
+	return GSResult.success("level is now %s" % GSLog.level_name(parsed))
 
 
-func _channel(args: PackedStringArray) -> DotResult:
+func _channel(args: PackedStringArray) -> GSResult:
 	if args.size() < 2:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"log channel <channel> <level>",
 			"or `log channel <channel> default` to clear the override"
 		)
@@ -217,36 +217,36 @@ func _channel(args: PackedStringArray) -> DotResult:
 	var channel: String = args[0]
 
 	if args[1].to_lower() == "default":
-		DotLog.clear_channel_level(channel)
-		return DotResult.success("%s follows the global level again" % channel)
+		GSLog.clear_channel_level(channel)
+		return GSResult.success("%s follows the global level again" % channel)
 
-	var parsed: int = DotLog.parse_level(args[1])
+	var parsed: int = GSLog.parse_level(args[1])
 	if parsed < 0:
-		return DotResult.fail(DotError.CODE_INVALID, "Unknown level '%s'." % args[1])
+		return GSResult.fail(GSError.CODE_INVALID, "Unknown level '%s'." % args[1])
 
-	DotLog.set_channel_level(channel, parsed)
-	return DotResult.success("%s is now %s" % [channel, DotLog.level_name(parsed)])
+	GSLog.set_channel_level(channel, parsed)
+	return GSResult.success("%s is now %s" % [channel, GSLog.level_name(parsed)])
 
 
-func _flush() -> DotResult:
+func _flush() -> GSResult:
 	if router == null:
-		return DotResult.fail(DotError.CODE_STATE, "No log router.")
+		return GSResult.fail(GSError.CODE_STATE, "No log router.")
 	# Started rather than awaited: a console command that blocked the frame on a slow
 	# collector would be a worse experience than one that returns and lets the next
 	# `log targets` report what happened.
 	router.flush_all()
-	return DotResult.success("flushing %d targets" % router.targets.size())
+	return GSResult.success("flushing %d targets" % router.targets.size())
 
 
 ## Puts one record of a chosen level through the whole pipeline.
 ## Logged on its own channel so a test record is never mistaken for the subsystem it is named after.
-func _test(args: PackedStringArray) -> DotResult:
-	var level: int = DotLog.Level.INFO
+func _test(args: PackedStringArray) -> GSResult:
+	var level: int = GSLog.Level.INFO
 	var rest: PackedStringArray = args
 
 	if args.size() > 0:
-		var parsed: int = DotLog.parse_level(args[0])
-		if parsed >= 0 and parsed < DotLog.Level.OFF:
+		var parsed: int = GSLog.parse_level(args[0])
+		if parsed >= 0 and parsed < GSLog.Level.OFF:
 			level = parsed
 			rest = args.slice(1)
 
@@ -254,50 +254,50 @@ func _test(args: PackedStringArray) -> DotResult:
 	if message == "":
 		message = "a deliberate test record"
 
-	if level >= DotLog.Level.FATAL:
+	if level >= GSLog.Level.FATAL:
 		# FATAL promises a shutdown follows. A console command that made that promise
 		# falsely would teach every reader of the log to stop believing the level, which
 		# is the only thing the level is worth.
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"FATAL is not a level you may send a test at.",
 			"it means the process cannot continue, and this one plainly can"
 		)
 
-	DotLog.at(level, CHANNEL, message, {"test": true, "level": DotLog.level_name(level)})
+	GSLog.at(level, CHANNEL, message, {"test": true, "level": GSLog.level_name(level)})
 
-	return DotResult.success(
+	return GSResult.success(
 		"emitted one %s record; `log targets` says where it got to"
-		% DotLog.level_name(level)
+		% GSLog.level_name(level)
 	)
 
 
 static func _level_meaning(level: int) -> String:
 	match level:
-		DotLog.Level.TRACE:
+		GSLog.Level.TRACE:
 			return "per-frame or per-packet detail"
-		DotLog.Level.DEBUG:
+		GSLog.Level.DEBUG:
 			return "decisions and state transitions"
-		DotLog.Level.INFO:
+		GSLog.Level.INFO:
 			return "what an admin would want kept"
-		DotLog.Level.WARN:
+		GSLog.Level.WARN:
 			return "recoverable; someone should look eventually"
-		DotLog.Level.ERROR:
+		GSLog.Level.ERROR:
 			return "the operation failed"
-		DotLog.Level.FATAL:
+		GSLog.Level.FATAL:
 			return "the process cannot continue"
 		_:
 			return "nothing is emitted"
 
 
-func _memory() -> DotLogTargetMemory:
+func _memory() -> GSLogTargetMemory:
 	if memory != null:
 		return memory
 	if router == null:
 		return null
-	for target: DotLogTarget in router.targets:
-		if target is DotLogTargetMemory:
-			memory = target as DotLogTargetMemory
+	for target: GSLogTarget in router.targets:
+		if target is GSLogTargetMemory:
+			memory = target as GSLogTargetMemory
 			return memory
 	return null
 

@@ -1,17 +1,17 @@
 @tool
-class_name DotLogFormat
+class_name GSLogFormat
 extends Resource
 
 ## How a batch of records is written for one particular collector.
-## [DotLogTargetHttp] owns batching, retries and the queue; a format owns the bytes, the headers and what counts as success.
+## [GSLogTargetHttp] owns batching, retries and the queue; a format owns the bytes, the headers and what counts as success.
 ## Read [method interpret] before writing one: a 200 is not a delivery.
 
 # No log channel: a pure encoder from a record to bytes, called from inside a target,
-# which is itself inside a log call -- so it must not log, for the reason DotLogTarget
+# which is itself inside a log call -- so it must not log, for the reason GSLogTarget
 # gives, and it has nothing outside the process to fail against anyway.
 
 ## The credential, whatever this service calls it.
-## Never logged; refused from the environment and command line by [DotLogConfig].
+## Never logged; refused from the environment and command line by [GSLogConfig].
 @export var token: String = ""
 
 ## Extra headers, merged last, for a gateway in front of the collector.
@@ -63,13 +63,13 @@ func max_bytes() -> int:
 
 
 ## Whether the response really means the records were accepted.
-## [param response] is [DotHttp]'s success value: [code]{status, headers, body, body_text, attempts}[/code]. The default trusts a 2xx.
-func interpret(_response: Dictionary) -> DotResult:
-	return DotResult.success(null)
+## [param response] is [GSHttp]'s success value: [code]{status, headers, body, body_text, attempts}[/code]. The default trusts a 2xx.
+func interpret(_response: Dictionary) -> GSResult:
+	return GSResult.success(null)
 
 
 ## Whether this format wants breadcrumbs and would rather have one event than a batch.
-## True only for the error trackers: [DotLogTargetHttp] then sends only the records worth an alert.
+## True only for the error trackers: [GSLogTargetHttp] then sends only the records worth an alert.
 func is_error_tracker() -> bool:
 	return false
 

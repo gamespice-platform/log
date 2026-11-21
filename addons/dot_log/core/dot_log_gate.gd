@@ -1,5 +1,5 @@
 @tool
-class_name DotLogGate
+class_name GSLogGate
 extends Resource
 
 ## Decides which records get past, and collapses the ones that repeat.
@@ -9,9 +9,9 @@ extends Resource
 # No `const CHANNEL`. A gate sits inside the log pipeline, so a record from here would go
 # back through the gate that raised it; what it drops it reports as a synthetic summary.
 
-## Minimum level to pass. Independent of [DotLog]'s own threshold, which has already
+## Minimum level to pass. Independent of [GSLog]'s own threshold, which has already
 ## been applied — this can only ever narrow it further.
-@export var min_level: DotLog.Level = DotLog.Level.TRACE
+@export var min_level: GSLog.Level = GSLog.Level.TRACE
 
 ## Channels to pass, as exact names or [code]prefix.*[/code] patterns. Empty passes all.
 @export var channels: PackedStringArray = PackedStringArray()
@@ -34,7 +34,7 @@ extends Resource
 
 ## Levels at or above this are never deduplicated.
 ## ERROR by default: a count alone does not carry the fields that tell ten thousand errors from one.
-@export var dedupe_below_level: DotLog.Level = DotLog.Level.ERROR
+@export var dedupe_below_level: GSLog.Level = GSLog.Level.ERROR
 
 ## Distinct lines tracked at once. Beyond this the oldest tracking entry is forgotten,
 ## which lets its next copy through — a leak-free failure mode, and the right one.
@@ -49,10 +49,10 @@ extends Resource
 @export_range(1.0, 10000.0, 1.0) var per_channel_burst: float = 200.0
 
 ## Levels at or above this bypass the rate limit entirely.
-@export var rate_limit_below_level: DotLog.Level = DotLog.Level.ERROR
+@export var rate_limit_below_level: GSLog.Level = GSLog.Level.ERROR
 
 var _rng := RandomNumberGenerator.new()
-var _limiter: DotRateLimiter = null
+var _limiter: GSRateLimiter = null
 
 ## key -> {"count": int, "first_ms": int, "last_ms": int, "event": Dictionary}
 var _repeats: Dictionary = {}
@@ -74,7 +74,7 @@ func _init() -> void:
 ## Whether this event should be written.
 ## Call once per event per target: the dedupe counters and rate-limit buckets advance as a side effect.
 func allows(event: Dictionary) -> bool:
-	var level: int = int(event.get("level", DotLog.Level.INFO))
+	var level: int = int(event.get("level", GSLog.Level.INFO))
 	var channel: String = String(event.get("channel", ""))
 
 	if level < min_level:
@@ -133,8 +133,8 @@ func _close_window(entry: Dictionary) -> void:
 	var original: Dictionary = entry["event"]
 	var elapsed: float = float(int(entry["last_ms"]) - int(entry["first_ms"])) / 1000.0
 
-	_pending.append(DotLogEvent.synthetic(
-		int(original.get("level", DotLog.Level.INFO)),
+	_pending.append(GSLogEvent.synthetic(
+		int(original.get("level", GSLog.Level.INFO)),
 		String(original.get("channel", "")),
 		String(original.get("message", "")),
 		{
@@ -155,7 +155,7 @@ func _channel_allowed(channel: String) -> bool:
 
 func _matches(channel: String, list: PackedStringArray) -> bool:
 	for listed: String in list:
-		var pattern := DotLog.display_channel(listed)
+		var pattern := GSLog.display_channel(listed)
 		if pattern == channel:
 			return true
 		if pattern.ends_with("*") and channel.begins_with(pattern.substr(0, pattern.length() - 1)):
@@ -164,9 +164,9 @@ func _matches(channel: String, list: PackedStringArray) -> bool:
 
 
 func _sampled(level: int) -> bool:
-	if level == DotLog.Level.TRACE and trace_sample < 1.0:
+	if level == GSLog.Level.TRACE and trace_sample < 1.0:
 		return _rng.randf() < trace_sample
-	if level == DotLog.Level.DEBUG and debug_sample < 1.0:
+	if level == GSLog.Level.DEBUG and debug_sample < 1.0:
 		return _rng.randf() < debug_sample
 	return true
 
@@ -175,7 +175,7 @@ func _deduped(event: Dictionary, level: int) -> bool:
 	if dedupe_window_sec <= 0.0 or level >= dedupe_below_level:
 		return true
 
-	var key: String = DotLogEvent.repeat_key(event)
+	var key: String = GSLogEvent.repeat_key(event)
 	var now: int = Time.get_ticks_msec()
 	var window_ms: int = int(dedupe_window_sec * 1000.0)
 
@@ -226,7 +226,7 @@ func _within_rate(channel: String, level: int) -> bool:
 		return true
 
 	if _limiter == null:
-		_limiter = DotRateLimiter.new(per_channel_rate, per_channel_burst)
+		_limiter = GSRateLimiter.new(per_channel_rate, per_channel_burst)
 
 	return _limiter.allow(channel)
 
@@ -246,7 +246,7 @@ func stats() -> Dictionary:
 
 func describe() -> Dictionary:
 	var out: Dictionary = stats()
-	out["min_level"] = DotLog.level_name(min_level)
+	out["min_level"] = GSLog.level_name(min_level)
 	out["channels"] = ",".join(channels) if not channels.is_empty() else "*"
 	out["dedupe_sec"] = dedupe_window_sec
 	out["rate"] = per_channel_rate

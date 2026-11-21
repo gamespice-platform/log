@@ -1,5 +1,5 @@
 @tool
-class_name DotLogRedactor
+class_name GSLogRedactor
 extends Resource
 
 ## Removes the things that must not leave the process, before anything ships them.
@@ -54,7 +54,7 @@ func _init(p_secret_keys: PackedStringArray = PackedStringArray()) -> void:
 
 ## Compiles the patterns. Called on first use; call it early to surface a bad pattern at
 ## boot rather than on the first ERROR at three in the morning.
-func compile() -> DotResult:
+func compile() -> GSResult:
 	_patterns.clear()
 	_compiled = true
 
@@ -84,22 +84,22 @@ func compile() -> DotResult:
 			# Both checks: create_from_string returns a RegEx with is_valid() false for a bad
 			# pattern, not null, and that matches nothing for the life of the process. The caller
 			# keeps the patterns that compiled and is told which one did not.
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"A redaction pattern would not compile.",
 				source
 			)
 		_patterns.append(re)
 
-	return DotResult.success(_patterns.size())
+	return GSResult.success(_patterns.size())
 
 
 ## Redacts one event, returning a new [Dictionary]. The original is never touched.
 func apply(event: Dictionary) -> Dictionary:
 	if not _compiled:
-		var compiled: DotResult = compile()
+		var compiled: GSResult = compile()
 		if not compiled.ok:
-			DotLog.result(CHANNEL, "redactor patterns", compiled)
+			GSLog.result(CHANNEL, "redactor patterns", compiled)
 
 	var out: Dictionary = event.duplicate()
 	out["fields"] = redact_fields(event.get("fields", {}))
@@ -144,7 +144,7 @@ func redact_text(text: String) -> String:
 		return text
 
 	if not _compiled:
-		var compiled: DotResult = compile()
+		var compiled: GSResult = compile()
 		if not compiled.ok:
 			return text
 

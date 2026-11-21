@@ -1,9 +1,9 @@
 @tool
-class_name DotLogTargetSql
-extends DotLogTarget
+class_name GSLogTargetSql
+extends GSLogTarget
 
 ## Writes the log into a database table, in batches.
-## Godot ships no database driver, so the driver is duck-typed ([code]execute(sql, params) -> DotResult[/code], the shape of GameSpice Moderation's [code]DotSqlDriver[/code]) and everything else is in [DotLogSqlSchema].
+## Godot ships no database driver, so the driver is duck-typed ([code]execute(sql, params) -> GSResult[/code], the shape of GameSpice Moderation's [code]GSSqlDriver[/code]) and everything else is in [GSLogSqlSchema].
 ## Keep the file target on too: this one has a dependency, so it can be unavailable.
 
 const SELF_CHANNEL := "log.sql"
@@ -12,7 +12,7 @@ const SELF_CHANNEL := "log.sql"
 @export var table: String = "dot_log"
 
 ## Which SQL to speak. Ask the driver if it says, and set it here if it does not.
-@export var dialect: DotLogSqlSchema.Dialect = DotLogSqlSchema.Dialect.SQLITE
+@export var dialect: GSLogSqlSchema.Dialect = GSLogSqlSchema.Dialect.SQLITE
 
 ## Records per INSERT.
 ## One statement per batch, so also the transaction size. Older SQLite caps at 999 parameters (124 rows of eight), so this is checked at send.
@@ -25,10 +25,10 @@ const SELF_CHANNEL := "log.sql"
 ## Never automatic: a DELETE over a large table does not belong in a mid-round flush. Call it from a scheduled task or console command.
 @export_range(0, 3650, 1) var retention_days: int = 30
 
-## The database driver. Any object with `execute(sql, params) -> DotResult`.
+## The database driver. Any object with `execute(sql, params) -> GSResult`.
 var driver: Object = null
 
-var _buffer: DotLogBuffer = null
+var _buffer: GSLogBuffer = null
 var _context: Dictionary = {}
 var _sending: bool = false
 var _inserted: int = 0
@@ -39,7 +39,7 @@ func _init(p_driver: Object = null, p_table: String = "") -> void:
 	driver = p_driver
 	if p_table != "":
 		table = p_table
-	_buffer = DotLogBuffer.new(max_queued, DotLogBuffer.Policy.DROP_OLDEST)
+	_buffer = GSLogBuffer.new(max_queued, GSLogBuffer.Policy.DROP_OLDEST)
 
 
 func set_context(context: Dictionary) -> void:
@@ -48,41 +48,41 @@ func set_context(context: Dictionary) -> void:
 
 ## Checks the driver and creates the table.
 ## Created here, not by a migration: a log table has no history worth migrating, so a changed shape starts a new table.
-func open() -> DotResult:
+func open() -> GSResult:
 	if driver == null:
-		return DotResult.fail(
-			DotError.CODE_STATE,
+		return GSResult.fail(
+			GSError.CODE_STATE,
 			"No database driver was given to the SQL log target.",
 			"assign `driver` before starting the router"
 		)
 
 	if not driver.has_method("execute"):
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"The log driver has no execute(sql, params) method.",
 			str(driver.get_class())
 		)
 
 	if driver.has_method("is_available"):
-		var available: DotResult = driver.is_available()
+		var available: GSResult = driver.is_available()
 		if available != null and not available.ok:
 			return available
 
 	if driver.has_method("is_open") and not driver.is_open():
 		if driver.has_method("open"):
-			var opened: DotResult = await driver.open()
+			var opened: GSResult = await driver.open()
 			if opened != null and not opened.ok:
 				return opened.wrap("opening the log database")
 
 	_buffer.max_records = max_queued
 
-	for sql: String in DotLogSqlSchema.create_statements(table, dialect):
-		var made: DotResult = await driver.execute(sql, [])
+	for sql: String in GSLogSqlSchema.create_statements(table, dialect):
+		var made: GSResult = await driver.execute(sql, [])
 		if made != null and not made.ok:
 			return made.wrap("creating the log table")
 
 	_opened = true
-	return DotResult.success(table)
+	return GSResult.success(table)
 
 
 func close() -> void:
@@ -96,31 +96,31 @@ func write(event: Dictionary) -> void:
 	_buffer.push(event)
 
 
-func flush() -> DotResult:
+func flush() -> GSResult:
 	if _buffer.is_empty() or not _opened:
-		return DotResult.success(0)
+		return GSResult.success(0)
 
 	if _sending:
 		# One batch in flight at a time. Two concurrent inserts from one queue would
 		# interleave, and a retry would then have to work out which rows had landed.
-		return DotResult.success(0)
+		return GSResult.success(0)
 
 	_sending = true
 	var total: int = 0
 
 	while not _buffer.is_empty():
 		var batch: Array[Dictionary] = _buffer.take(batch_size)
-		var statement: Dictionary = DotLogSqlSchema.insert_statement(
+		var statement: Dictionary = GSLogSqlSchema.insert_statement(
 			table, dialect, batch, _context
 		)
 
-		var res: DotResult = await driver.execute(
+		var res: GSResult = await driver.execute(
 			String(statement["sql"]), statement["params"]
 		)
 
 		if res == null:
-			res = DotResult.fail(
-				DotError.CODE_INTERNAL, "The driver returned nothing."
+			res = GSResult.fail(
+				GSError.CODE_INTERNAL, "The driver returned nothing."
 			)
 
 		if not res.ok:
@@ -136,7 +136,7 @@ func flush() -> DotResult:
 		_inserted += batch.size()
 
 	_sending = false
-	return DotResult.success(total)
+	return GSResult.success(total)
 
 
 func is_buffered() -> bool:
@@ -148,40 +148,40 @@ func pending() -> int:
 
 
 ## Deletes rows older than [member retention_days]. Returns what the driver said.
-func prune() -> DotResult:
+func prune() -> GSResult:
 	if retention_days <= 0:
-		return DotResult.success(0)
+		return GSResult.success(0)
 	if driver == null or not _opened:
-		return DotResult.fail(DotError.CODE_STATE, "The log database is not open.")
+		return GSResult.fail(GSError.CODE_STATE, "The log database is not open.")
 
 	var cutoff_ms: int = (
 		int(Time.get_unix_time_from_system() * 1000.0)
 		- retention_days * 86400 * 1000
 	)
-	var statement: Dictionary = DotLogSqlSchema.prune_statement(
+	var statement: Dictionary = GSLogSqlSchema.prune_statement(
 		table, dialect, cutoff_ms
 	)
-	var res: DotResult = await driver.execute(
+	var res: GSResult = await driver.execute(
 		String(statement["sql"]), statement["params"]
 	)
-	return res if res != null else DotResult.success(0)
+	return res if res != null else GSResult.success(0)
 
 
 ## The most recent rows back out of the table, for a console command.
-func tail(limit: int = 50, channel: String = "") -> DotResult:
+func tail(limit: int = 50, channel: String = "") -> GSResult:
 	if driver == null or not driver.has_method("query"):
-		return DotResult.fail(
-			DotError.CODE_UNSUPPORTED, "This driver cannot read rows back."
+		return GSResult.fail(
+			GSError.CODE_UNSUPPORTED, "This driver cannot read rows back."
 		)
 
-	var statement: Dictionary = DotLogSqlSchema.tail_statement(
+	var statement: Dictionary = GSLogSqlSchema.tail_statement(
 		table, dialect, limit, channel
 	)
-	var res: DotResult = await driver.query(
+	var res: GSResult = await driver.query(
 		String(statement["sql"]), statement["params"]
 	)
-	return res if res != null else DotResult.fail(
-		DotError.CODE_INTERNAL, "The driver returned nothing."
+	return res if res != null else GSResult.fail(
+		GSError.CODE_INTERNAL, "The driver returned nothing."
 	)
 
 

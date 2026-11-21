@@ -1,6 +1,6 @@
 @tool
-class_name DotLogFormatOtlp
-extends DotLogFormat
+class_name GSLogFormatOtlp
+extends GSLogFormat
 
 ## OpenTelemetry logs over OTLP/HTTP with a JSON body (Godot has no protobuf).
 ## Point at an OpenTelemetry Collector to fan out. Spec rules: 64-bit numbers are strings, and every attribute value is a tagged union such as [code]{"stringValue": "x"}[/code].
@@ -51,8 +51,8 @@ func build(events: Array, context: Dictionary) -> PackedByteArray:
 
 
 func _record(event: Dictionary) -> Dictionary:
-	var level: int = int(event.get("level", DotLog.Level.INFO))
-	var nanos: String = DotLogEvent.time_ns(event)
+	var level: int = int(event.get("level", GSLog.Level.INFO))
+	var nanos: String = GSLogEvent.time_ns(event)
 
 	var attributes: Array = []
 
@@ -71,7 +71,7 @@ func _record(event: Dictionary) -> Dictionary:
 		# a collector that sees no observedTimeUnixNano stamps its own arrival time,
 		# which for a batched shipper is up to a flush interval wrong.
 		"observedTimeUnixNano": nanos,
-		"severityNumber": DotLogEvent.otlp_severity(level),
+		"severityNumber": GSLogEvent.otlp_severity(level),
 		"severityText": String(event.get("level_name", "INFO")),
 		"body": {"stringValue": String(event.get("message", ""))},
 		"attributes": attributes,
@@ -142,7 +142,7 @@ func max_bytes() -> int:
 	return 4 * 1024 * 1024
 
 
-func interpret(response: Dictionary) -> DotResult:
+func interpret(response: Dictionary) -> GSResult:
 	var status: int = int(response.get("status", 0))
 
 	if status >= 200 and status < 300:
@@ -156,13 +156,13 @@ func interpret(response: Dictionary) -> DotResult:
 					"rejectedLogRecords", 0
 				))
 				if rejected > 0:
-					return DotResult.fail(
-						DotError.CODE_INVALID,
+					return GSResult.fail(
+						GSError.CODE_INVALID,
 						"The collector rejected %d records." % rejected,
 						str((partial as Dictionary).get("errorMessage", ""))
 					)
-		return DotResult.success(null)
+		return GSResult.success(null)
 
-	return DotResult.failure(
-		DotError.from_http(status, String(response.get("body_text", "")))
+	return GSResult.failure(
+		GSError.from_http(status, String(response.get("body_text", "")))
 	)

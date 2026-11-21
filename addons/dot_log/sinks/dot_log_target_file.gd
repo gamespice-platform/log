@@ -1,6 +1,6 @@
 @tool
-class_name DotLogTargetFile
-extends DotLogTarget
+class_name GSLogTargetFile
+extends GSLogTarget
 
 ## Writes the log to a file on disk, rotating it so it cannot fill the volume.
 ## Buffered, never line-by-line (a flush per line is an IndexedDB transaction on web); [member flush_on_error] narrows the loss window for the lines that matter.
@@ -76,8 +76,8 @@ func set_context(context: Dictionary) -> void:
 	_context = context
 
 
-func open() -> DotResult:
-	var res: DotResult = _open_file()
+func open() -> GSResult:
+	var res: GSResult = _open_file()
 	if not res.ok:
 		note_failure(res)
 		return res
@@ -97,19 +97,19 @@ func write(event: Dictionary) -> void:
 	super(event)
 
 	_buffer.append(
-		DotLogEvent.flatten_json(event, _context, field_prefix)
+		GSLogEvent.flatten_json(event, _context, field_prefix)
 		if json_lines
-		else DotLogEvent.text_line(event)
+		else GSLogEvent.text_line(event)
 	)
 
-	var level: int = int(event.get("level", DotLog.Level.INFO))
+	var level: int = int(event.get("level", GSLog.Level.INFO))
 	if _buffer.size() >= max_buffered_lines:
 		_write_out()
-	elif flush_on_error and level >= DotLog.Level.ERROR:
+	elif flush_on_error and level >= GSLog.Level.ERROR:
 		_write_out()
 
 
-func flush() -> DotResult:
+func flush() -> GSResult:
 	return _write_out()
 
 
@@ -132,9 +132,9 @@ func rotations() -> int:
 	return _rotations
 
 
-func _write_out() -> DotResult:
+func _write_out() -> GSResult:
 	if _buffer.is_empty():
-		return DotResult.success(0)
+		return GSResult.success(0)
 
 	if _file == null:
 		# Not an error every flush: a target whose disk went away would otherwise
@@ -142,8 +142,8 @@ func _write_out() -> DotResult:
 		# noise the whole addon is trying to stop. It is counted once, at open.
 		var n_lost: int = _buffer.size()
 		_buffer.clear()
-		return DotResult.fail(
-			DotError.CODE_STATE, "The log file is not open.", str(n_lost) + " lines lost"
+		return GSResult.fail(
+			GSError.CODE_STATE, "The log file is not open.", str(n_lost) + " lines lost"
 		)
 
 	var text: String = "\n".join(_buffer) + "\n"
@@ -156,23 +156,23 @@ func _write_out() -> DotResult:
 
 	# Persist through IndexedDB on web, where an unsynced write is lost when the tab
 	# closes — which is exactly the moment the log becomes interesting.
-	DotWeb.sync_filesystem()
+	GSWeb.sync_filesystem()
 
 	var err: int = _file.get_error()
 	if err != OK and err != ERR_FILE_EOF:
-		var res: DotResult = DotResult.failure(
-			DotError.from_engine(err, "writing to '%s'" % _path)
+		var res: GSResult = GSResult.failure(
+			GSError.from_engine(err, "writing to '%s'" % _path)
 		)
 		note_failure(res)
 		return res
 
 	if _should_rotate():
-		var rotated: DotResult = _rotate()
+		var rotated: GSResult = _rotate()
 		if not rotated.ok:
 			note_failure(rotated)
 			return rotated
 
-	return DotResult.success(count)
+	return GSResult.success(count)
 
 
 func _should_rotate() -> bool:
@@ -183,14 +183,14 @@ func _should_rotate() -> bool:
 	return false
 
 
-func _rotate() -> DotResult:
+func _rotate() -> GSResult:
 	if _file != null:
 		_file.close()
 		_file = null
 
 	var saved: bool = new_file_per_run
 	new_file_per_run = true
-	var res: DotResult = _open_file()
+	var res: GSResult = _open_file()
 	new_file_per_run = saved
 
 	if res.ok:
@@ -202,8 +202,8 @@ static func _today() -> String:
 	return Time.get_date_string_from_system(true)
 
 
-func _open_file() -> DotResult:
-	var made: DotResult = DotPaths.ensure_dir(directory)
+func _open_file() -> GSResult:
+	var made: GSResult = GSPaths.ensure_dir(directory)
 	if not made.ok:
 		return made.wrap("preparing the log directory")
 
@@ -226,8 +226,8 @@ func _open_file() -> DotResult:
 		_file = FileAccess.open(_path, FileAccess.WRITE)
 
 	if _file == null:
-		return DotResult.failure(
-			DotError.from_engine(
+		return GSResult.failure(
+			GSError.from_engine(
 				FileAccess.get_open_error(), "opening log file '%s'" % _path
 			)
 		)
@@ -239,7 +239,7 @@ func _open_file() -> DotResult:
 		_bytes = int(_file.get_position())
 
 	_prune()
-	return DotResult.success(_path)
+	return GSResult.success(_path)
 
 
 func _prune() -> void:

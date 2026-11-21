@@ -15,14 +15,14 @@ var _entered := 0
 var _completed := 0
 
 func _record(
-	level: int = DotLog.Level.INFO,
+	level: int = GSLog.Level.INFO,
 	channel: String = "net",
 	message: String = "hello",
 	fields: Dictionary = {}
 ) -> Dictionary:
 	return {
 		"level": level,
-		"level_name": DotLog.level_name(level),
+		"level_name": GSLog.level_name(level),
 		"channel": channel,
 		"message": message,
 		"fields": fields,
@@ -31,12 +31,12 @@ func _record(
 
 
 func _event(
-	level: int = DotLog.Level.INFO,
+	level: int = GSLog.Level.INFO,
 	channel: String = "net",
 	message: String = "hello",
 	fields: Dictionary = {}
 ) -> Dictionary:
-	return DotLogEvent.from_record(_record(level, channel, message, fields))
+	return GSLogEvent.from_record(_record(level, channel, message, fields))
 
 
 func _parse(text: String) -> Variant:
@@ -53,7 +53,7 @@ func _done() -> void:
 	_completed += 1
 
 
-func _check(what: String, passed: bool, res: DotResult = null, note: String = "") -> void:
+func _check(what: String, passed: bool, res: GSResult = null, note: String = "") -> void:
 	if passed:
 		_passed += 1
 		_line("  %-56s ok" % what)
@@ -69,7 +69,7 @@ func _check(what: String, passed: bool, res: DotResult = null, note: String = ""
 
 
 func _finish() -> void:
-	if not DotPlatform.is_headless():
+	if not GSPlatform.is_headless():
 		return
 
 	await get_tree().process_frame

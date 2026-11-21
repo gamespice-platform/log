@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="dot-log"
-config/description="The sink layer for DotLog: rotating files, an in-memory ring, syslog, a SQL table, and batched HTTP shipping to the log services in common use. Gating, redaction and batching happen once, in front of all of them."
+config/description="The sink layer for GSLog: rotating files, an in-memory ring, syslog, a SQL table, and batched HTTP shipping to the log services in common use. Gating, redaction and batching happen once, in front of all of them."
 config/version="0.1.0"
 run/main_scene="res://examples/log_selftest.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")

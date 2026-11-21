@@ -1,6 +1,6 @@
 @tool
-class_name DotLogFormatElastic
-extends DotLogFormat
+class_name GSLogFormatElastic
+extends GSLogFormat
 
 ## Elasticsearch and OpenSearch, through the bulk API.
 ## The bulk API answers 200 when it rejected everything, so [method interpret] reads the per-document [code]errors[/code] flag.
@@ -66,18 +66,18 @@ func build(events: Array, context: Dictionary) -> PackedByteArray:
 func _document(event: Dictionary, context: Dictionary) -> Dictionary:
 	var doc: Dictionary = {
 		# The Elastic Common Schema names, so the stock dashboards work unmodified.
-		"@timestamp": DotLogEvent.iso8601(event),
+		"@timestamp": GSLogEvent.iso8601(event),
 		"log": {"level": String(event.get("severity", "info"))},
 		"message": String(event.get("message", "")),
 		"event": {"dataset": String(event.get("channel", ""))},
 	}
 
 	for k: Variant in context:
-		doc[str(k)] = DotLogEvent.json_value(context[k])
+		doc[str(k)] = GSLogEvent.json_value(context[k])
 
 	var fields: Dictionary = event.get("fields", {})
 	for k: Variant in fields:
-		doc[field_prefix + str(k)] = DotLogEvent.json_value(fields[k])
+		doc[field_prefix + str(k)] = GSLogEvent.json_value(fields[k])
 
 	return doc
 
@@ -107,11 +107,11 @@ func max_bytes() -> int:
 	return 5 * 1024 * 1024
 
 
-func interpret(response: Dictionary) -> DotResult:
+func interpret(response: Dictionary) -> GSResult:
 	var status: int = int(response.get("status", 0))
 	if status < 200 or status >= 300:
-		return DotResult.failure(
-			DotError.from_http(status, String(response.get("body_text", "")))
+		return GSResult.failure(
+			GSError.from_http(status, String(response.get("body_text", "")))
 		)
 
 	var body: Variant = response.get("body_text", "")
@@ -120,15 +120,15 @@ func interpret(response: Dictionary) -> DotResult:
 		# A 200 whose body is not the bulk response means something in front of
 		# Elasticsearch answered — a proxy, a login page. Treated as a failure, because
 		# nothing was indexed.
-		return DotResult.fail(
-			DotError.CODE_PARSE,
+		return GSResult.fail(
+			GSError.CODE_PARSE,
 			"The bulk response was not JSON.",
 			String(body).substr(0, 256)
 		)
 
 	var doc: Dictionary = parsed as Dictionary
 	if not bool(doc.get("errors", false)):
-		return DotResult.success(int(doc.get("took", 0)))
+		return GSResult.success(int(doc.get("took", 0)))
 
 	# At least one document was rejected. The first reason is worth more than the count:
 	# they are nearly always all the same mapping conflict.
@@ -149,8 +149,8 @@ func interpret(response: Dictionary) -> DotResult:
 					str(err.get("type", "?")), str(err.get("reason", "?"))
 				]
 
-	return DotResult.fail(
-		DotError.CODE_INVALID,
+	return GSResult.fail(
+		GSError.CODE_INVALID,
 		"Elasticsearch rejected %d of %d documents." % [rejected, items.size()],
 		first_reason
 	)

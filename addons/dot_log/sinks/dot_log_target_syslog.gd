@@ -1,6 +1,6 @@
 @tool
-class_name DotLogTargetSyslog
-extends DotLogTarget
+class_name GSLogTargetSyslog
+extends GSLogTarget
 
 ## Sends records to a syslog collector, in the format from RFC 5424.
 ## Worth having because it is already there: no agent, key or account. UDP is sent as the record arrives and truncates at [member max_message_bytes]; TCP is octet-counted (RFC 6587) and sent on flush.
@@ -69,15 +69,15 @@ func set_context(context: Dictionary) -> void:
 	_context = context
 
 
-func open() -> DotResult:
+func open() -> GSResult:
 	if host_name == "":
 		host_name = _default_hostname()
 	_procid = str(OS.get_process_id())
 
 	if transport == Transport.UDP:
-		if not DotPlatform.has_udp():
-			return DotResult.fail(
-				DotError.CODE_UNSUPPORTED,
+		if not GSPlatform.has_udp():
+			return GSResult.fail(
+				GSError.CODE_UNSUPPORTED,
 				"Syslog over UDP needs UDP, which this platform does not have.",
 				"use an HTTP target on web"
 			)
@@ -85,26 +85,26 @@ func open() -> DotResult:
 		var err: int = _udp.connect_to_host(host, port)
 		if err != OK:
 			_udp = null
-			return DotResult.failure(
-				DotError.from_engine(err, "resolving syslog host '%s'" % host)
+			return GSResult.failure(
+				GSError.from_engine(err, "resolving syslog host '%s'" % host)
 			)
 	else:
-		if DotPlatform.is_web():
+		if GSPlatform.is_web():
 			# There is no TCP capability question to ask GameSpice Core: a browser has no raw
 			# sockets of any kind, and has_udp() already answers false there for the same
 			# underlying reason.
-			return DotResult.fail(
-				DotError.CODE_UNSUPPORTED,
+			return GSResult.fail(
+				GSError.CODE_UNSUPPORTED,
 				"Syslog over TCP needs a raw socket, which a browser does not have.",
 				"use an HTTP target on web"
 			)
-		var connected: DotResult = _connect_tcp()
+		var connected: GSResult = _connect_tcp()
 		if not connected.ok:
 			# Not fatal: the collector may simply not be up yet, and the flush retries.
 			note_failure(connected)
 
 	_opened = true
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 func close() -> void:
@@ -137,9 +137,9 @@ func write(event: Dictionary) -> void:
 		_dropped += 1
 
 
-func flush() -> DotResult:
+func flush() -> GSResult:
 	if transport == Transport.UDP:
-		return DotResult.success(0)
+		return GSResult.success(0)
 	return _send_queued_tcp()
 
 
@@ -153,8 +153,8 @@ func pending() -> int:
 
 ## One record as a syslog message, without any transport framing.
 func format_message(event: Dictionary) -> String:
-	var level: int = int(event.get("level", DotLog.Level.INFO))
-	var severity: int = DotLogEvent.syslog_severity(level)
+	var level: int = int(event.get("level", GSLog.Level.INFO))
+	var severity: int = GSLogEvent.syslog_severity(level)
 	var pri: int = facility * 8 + severity
 
 	var channel: String = String(event.get("channel", ""))
@@ -162,7 +162,7 @@ func format_message(event: Dictionary) -> String:
 
 	var head: String = "<%d>1 %s %s %s %s %s " % [
 		pri,
-		DotLogEvent.iso8601(event),
+		GSLogEvent.iso8601(event),
 		_nilable(host_name),
 		_nilable(app_name),
 		_procid,
@@ -233,24 +233,24 @@ static func _default_hostname() -> String:
 	return name
 
 
-func _connect_tcp() -> DotResult:
+func _connect_tcp() -> GSResult:
 	_tcp = StreamPeerTCP.new()
 	var err: int = _tcp.connect_to_host(host, port)
 	if err != OK:
 		_tcp = null
-		return DotResult.failure(
-			DotError.from_engine(err, "connecting to syslog at %s:%d" % [host, port])
+		return GSResult.failure(
+			GSError.from_engine(err, "connecting to syslog at %s:%d" % [host, port])
 		)
 	_reconnects += 1
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
-func _send_queued_tcp() -> DotResult:
+func _send_queued_tcp() -> GSResult:
 	if _queue.is_empty():
-		return DotResult.success(0)
+		return GSResult.success(0)
 
 	if _tcp == null:
-		var reconnected: DotResult = _connect_tcp()
+		var reconnected: GSResult = _connect_tcp()
 		if not reconnected.ok:
 			return reconnected
 
@@ -259,12 +259,12 @@ func _send_queued_tcp() -> DotResult:
 
 	if status == StreamPeerTCP.STATUS_CONNECTING:
 		# Not an error. The queue holds, and the next flush tries again.
-		return DotResult.success(0)
+		return GSResult.success(0)
 
 	if status != StreamPeerTCP.STATUS_CONNECTED:
 		_tcp = null
-		return DotResult.fail(
-			DotError.CODE_NETWORK, "The syslog connection dropped.", host
+		return GSResult.fail(
+			GSError.CODE_NETWORK, "The syslog connection dropped.", host
 		)
 
 	var sent: int = 0
@@ -280,15 +280,15 @@ func _send_queued_tcp() -> DotResult:
 		if err != OK:
 			# Everything from here stays queued, in order.
 			_queue = _queue.slice(sent)
-			var res: DotResult = DotResult.failure(
-				DotError.from_engine(err, "sending to syslog")
+			var res: GSResult = GSResult.failure(
+				GSError.from_engine(err, "sending to syslog")
 			)
 			note_failure(res)
 			return res
 		sent += 1
 
 	_queue.clear()
-	return DotResult.success(sent)
+	return GSResult.success(sent)
 
 
 func describe() -> Dictionary:

@@ -8,7 +8,7 @@ const _ICON := "res://addons/dot_log/icon_placeholder.svg"
 
 const _TYPES := [
 	[
-		"DotLogRouter",
+		"GSLogRouter",
 		"Node",
 		"res://addons/dot_log/runtime/dot_log_router.gd",
 	],

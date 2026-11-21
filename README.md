@@ -1,23 +1,23 @@
 [![Log - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/59-gs-log)
 
-Where your game's log lines go. Every [**GameSpice**](https://gamespice.net) addon already writes through `DotLog` (from [GameSpice Core](https://github.com/gamespice-platform/core)); dot-log decides what happens to those records next: a rotating file, a memory ring, syslog, a database table or a hosted log service. It also filters, hides secrets, collapses floods and batches, once, in front of every destination. Part of TMC's open source **GameSpice** collection (MIT licence).
+Where your game's log lines go. Every [**GameSpice**](https://gamespice.net) addon already writes through `GSLog` (from [GameSpice Core](https://github.com/gamespice-platform/core)); dot-log decides what happens to those records next: a rotating file, a memory ring, syslog, a database table or a hosted log service. It also filters, hides secrets, collapses floods and batches, once, in front of every destination. Part of TMC's open source **GameSpice** collection (MIT licence).
 
 > Built with Claude Code. Every addon has a headless test suite and the suites pass, but little of this has met real players yet. Please report rough edges.
 
-`DotLog` stays the front door and your calls do not change. GameSpice Log plugs in behind it.
+`GSLog` stays the front door and your calls do not change. GameSpice Log plugs in behind it.
 
 ## Install
 
-Copy `addons/dot_log/` and dot-core's `addons/dot_core/` into your project and enable dot-log under **Project > Project Settings > Plugins**. There is no autoload: you create a `DotLogRouter` where you want one.
+Copy `addons/dot_log/` and dot-core's `addons/dot_core/` into your project and enable dot-log under **Project > Project Settings > Plugins**. There is no autoload: you create a `GSLogRouter` where you want one.
 
 ## Quick start
 
 ```gdscript
-var router := DotLogRouter.new()
+var router := GSLogRouter.new()
 router.set_context({"service": "playlot", "env": "prod", "host": "eu-1"})
 
-router.targets.append(DotLogTargetFile.new("user://logs", "playlot"))
-router.targets.append(DotLogTargetMemory.new(512))       # the console, and bug reports
+router.targets.append(GSLogTargetFile.new("user://logs", "playlot"))
+router.targets.append(GSLogTargetMemory.new(512))       # the console, and bug reports
 
 add_child(router)                                        # starts on _ready
 ```
@@ -25,19 +25,19 @@ add_child(router)                                        # starts on _ready
 That gives a rotating log file and the last 512 lines in memory. To also ship records to a collector:
 
 ```gdscript
-var loki := DotLogFormatLoki.new()
+var loki := GSLogFormatLoki.new()
 loki.token = token                                       # never from the environment
 
-var remote := DotLogTargetHttp.new(loki, "https://logs.example.com")
-remote.gate = DotLogGate.new()
-remote.gate.min_level = DotLog.Level.INFO                # the file keeps DEBUG
+var remote := GSLogTargetHttp.new(loki, "https://logs.example.com")
+remote.gate = GSLogGate.new()
+remote.gate.min_level = GSLog.Level.INFO                # the file keeps DEBUG
 await router.add_target(remote)
 ```
 
 Or describe it all as configuration, which is what a deployment wants:
 
 ```gdscript
-var config := DotLogConfig.new()
+var config := GSLogConfig.new()
 var loaded := config.load_layered("user://logging.json")  # file, then env, then command line
 config.apply_levels()
 add_child(config.build_router())
@@ -77,37 +77,37 @@ Every line carries its level in a fixed width, so messages line up:
 2026-09-14T04:59:09.114Z WRN vote     could not open the vote yet reason=time
 ```
 
-`DotLog.level_style = DotLog.LevelStyle.NAME` spells levels out (`INFO`, `WARN`). Wire formats use the field their collector expects. In a database the level is two columns: `level` (an integer, for sorting and filtering) and `level_name` (to read). The index is `(channel, level)`.
+`GSLog.level_style = GSLog.LevelStyle.NAME` spells levels out (`INFO`, `WARN`). Wire formats use the field their collector expects. In a database the level is two columns: `level` (an integer, for sorting and filtering) and `level_name` (to read). The index is `(channel, level)`.
 
 ## Targets
 
 | Target | For |
 | --- | --- |
-| `DotLogTargetFile` | A rotating file. Human text or JSON lines. |
-| `DotLogTargetMemory` | A ring buffer for an in-game console, `status` output, bug reports and crash breadcrumbs. |
-| `DotLogTargetSyslog` | RFC 5424 over UDP or TCP. |
-| `DotLogTargetSql` | A table through any driver with `execute(sql, params)`: batched inserts, a retention delete and a tail query. |
-| `DotLogTargetHttp` | Hosted services; a `DotLogFormat` decides the bytes. |
+| `GSLogTargetFile` | A rotating file. Human text or JSON lines. |
+| `GSLogTargetMemory` | A ring buffer for an in-game console, `status` output, bug reports and crash breadcrumbs. |
+| `GSLogTargetSyslog` | RFC 5424 over UDP or TCP. |
+| `GSLogTargetSql` | A table through any driver with `execute(sql, params)`: batched inserts, a retention delete and a tail query. |
+| `GSLogTargetHttp` | Hosted services; a `GSLogFormat` decides the bytes. |
 
 ## Wire formats
 
 | Format | Sends to |
 | --- | --- |
-| `DotLogFormatNdjson` | One JSON object per line. Accepted by most agents and pipelines. Start here. |
-| `DotLogFormatLoki` | Grafana Loki, with low-cardinality labels. |
-| `DotLogFormatElastic` | Elasticsearch and OpenSearch through `_bulk`. It checks the body, because that API answers 200 even when it rejected everything. |
-| `DotLogFormatSplunk` | Splunk HTTP Event Collector. |
-| `DotLogFormatDatadog` | Datadog v2 log intake. |
-| `DotLogFormatSeq` | Seq (CLEF), which is easy to self-host. |
-| `DotLogFormatGelf` | Graylog GELF over HTTP. |
-| `DotLogFormatOtlp` | OpenTelemetry logs over OTLP/HTTP. |
-| `DotLogFormatSentry` | Error tracking: only serious records become events, and the memory ring supplies breadcrumbs. |
+| `GSLogFormatNdjson` | One JSON object per line. Accepted by most agents and pipelines. Start here. |
+| `GSLogFormatLoki` | Grafana Loki, with low-cardinality labels. |
+| `GSLogFormatElastic` | Elasticsearch and OpenSearch through `_bulk`. It checks the body, because that API answers 200 even when it rejected everything. |
+| `GSLogFormatSplunk` | Splunk HTTP Event Collector. |
+| `GSLogFormatDatadog` | Datadog v2 log intake. |
+| `GSLogFormatSeq` | Seq (CLEF), which is easy to self-host. |
+| `GSLogFormatGelf` | Graylog GELF over HTTP. |
+| `GSLogFormatOtlp` | OpenTelemetry logs over OTLP/HTTP. |
+| `GSLogFormatSentry` | Error tracking: only serious records become events, and the memory ring supplies breadcrumbs. |
 
 A new format is one small file: build the body, name the path and header, say what success looks like.
 
 ## Settings
 
-`DotLogConfig` is layered like every GameSpice config: defaults, JSON file, `DOT_LOG_*` environment, `--log-*` command line. `remote_token` and `sentry_dsn` are accepted from the file only, never from the environment or command line.
+`GSLogConfig` is layered like every GameSpice config: defaults, JSON file, `DOT_LOG_*` environment, `--log-*` command line. `remote_token` and `sentry_dsn` are accepted from the file only, never from the environment or command line.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
@@ -143,11 +143,11 @@ A new format is one small file: build the body, name the path and header, say wh
 
 ## The `log` command
 
-`DotLogCommands` is a console command that works with a client or server console without GameSpice Log depending on either:
+`GSLogCommands` is a console command that works with a client or server console without GameSpice Log depending on either:
 
 ```gdscript
-console.add_source(DotConsoleBridge.wrap(DotLogCommands.new(router), "log"))      # dot-console
-server.console.add_source(DotLogCommands.new(router), DotAdminFlags.GENERIC)       # dot-server
+console.add_source(GSConsoleBridge.wrap(GSLogCommands.new(router), "log"))      # dot-console
+server.console.add_source(GSLogCommands.new(router), GSAdminFlags.GENERIC)       # dot-server
 ```
 
 | Command | Does |
@@ -163,7 +163,7 @@ server.console.add_source(DotLogCommands.new(router), DotAdminFlags.GENERIC)    
 
 ## Browser builds
 
-A web build has no UDP, raw TCP or readable files. `DotLogTargetHttp` is the only target that is useful there. The file target still writes, into `user://` (a browser storage mirror a person cannot read directly).
+A web build has no UDP, raw TCP or readable files. `GSLogTargetHttp` is the only target that is useful there. The file target still writes, into `user://` (a browser storage mirror a person cannot read directly).
 
 ## More
 

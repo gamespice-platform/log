@@ -1,16 +1,16 @@
 @tool
-class_name DotLogFormatSentry
-extends DotLogFormat
+class_name GSLogFormatSentry
+extends GSLogFormat
 
 ## Sentry, as envelopes of events.
-## Not a log collector: [method is_error_tracker] is true, so only records at or above the gate level become events and the rest breadcrumbs from a [DotLogTargetMemory].
+## Not a log collector: [method is_error_tracker] is true, so only records at or above the gate level become events and the rest breadcrumbs from a [GSLogTargetMemory].
 ## The DSN holds a public key, not a secret, but is still refused from environment and command line.
 
 ## The DSN from the project's settings, [code]https://<key>@<host>/<project>[/code].
 @export var dsn: String = ""
 
 ## Where breadcrumbs come from. Optional, and the report is much thinner without one.
-var breadcrumb_source: DotLogTargetMemory = null
+var breadcrumb_source: GSLogTargetMemory = null
 
 ## How many breadcrumbs to attach. Sentry's own limit is 100.
 @export_range(0, 100, 1) var max_breadcrumbs: int = 30
@@ -109,15 +109,15 @@ func _event_body(
 ) -> Dictionary:
 	var body: Dictionary = {
 		"event_id": event_id,
-		"timestamp": DotLogEvent.time_sec(event),
+		"timestamp": GSLogEvent.time_sec(event),
 		# `other` rather than a language name: the platform field selects how Sentry
 		# tries to symbolicate and render a stack, and claiming one we do not produce
 		# gets a worse result than claiming none.
 		"platform": "other",
-		"level": _sentry_level(int(event.get("level", DotLog.Level.ERROR))),
+		"level": _sentry_level(int(event.get("level", GSLog.Level.ERROR))),
 		"logger": String(event.get("channel", "")),
 		"message": {"formatted": String(event.get("message", ""))},
-		"extra": DotLogEvent.json_fields(event.get("fields", {})),
+		"extra": GSLogEvent.json_fields(event.get("fields", {})),
 		"tags": _tags_for(event, context),
 	}
 
@@ -158,13 +158,13 @@ func _tags_for(event: Dictionary, context: Dictionary) -> Dictionary:
 
 static func _sentry_level(level: int) -> String:
 	match level:
-		DotLog.Level.TRACE, DotLog.Level.DEBUG:
+		GSLog.Level.TRACE, GSLog.Level.DEBUG:
 			return "debug"
-		DotLog.Level.INFO:
+		GSLog.Level.INFO:
 			return "info"
-		DotLog.Level.WARN:
+		GSLog.Level.WARN:
 			return "warning"
-		DotLog.Level.FATAL:
+		GSLog.Level.FATAL:
 			return "fatal"
 		_:
 			return "error"
@@ -227,30 +227,30 @@ func max_bytes() -> int:
 	return 1024 * 1024
 
 
-func interpret(response: Dictionary) -> DotResult:
+func interpret(response: Dictionary) -> GSResult:
 	var status: int = int(response.get("status", 0))
 
 	if status >= 200 and status < 300:
-		return DotResult.success(null)
+		return GSResult.success(null)
 
 	if status == 429:
 		# Sentry rate-limits per project and says for how long. Honoured rather than
 		# retried, because retrying through a rate limit extends it.
-		var error: DotError = DotError.from_http(status, "")
-		error.code = DotError.CODE_RATE_LIMITED
+		var error: GSError = GSError.from_http(status, "")
+		error.code = GSError.CODE_RATE_LIMITED
 		var headers: Dictionary = response.get("headers", {})
 		for k: Variant in headers:
 			if str(k).to_lower() == "retry-after":
 				error.retry_after = str(headers[k]).to_float()
-		return DotResult.failure(error)
+		return GSResult.failure(error)
 
 	if status == 413:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"The envelope was too large.",
 			"lower max_breadcrumbs, or the size of the fields being logged"
 		)
 
-	return DotResult.failure(
-		DotError.from_http(status, String(response.get("body_text", "")))
+	return GSResult.failure(
+		GSError.from_http(status, String(response.get("body_text", "")))
 	)

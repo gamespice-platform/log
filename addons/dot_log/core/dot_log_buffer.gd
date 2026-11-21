@@ -1,4 +1,4 @@
-class_name DotLogBuffer
+class_name GSLogBuffer
 extends RefCounted
 
 ## A bounded queue of events (records and bytes) with an explicit drop policy.
@@ -28,10 +28,10 @@ var max_bytes: int = 8 * 1024 * 1024:
 var policy: Policy = Policy.DROP_OLDEST:
 	set(value):
 		policy = value
-		_queue.policy = DotBoundedBuffer.Policy.DROP_OLDEST if value == Policy.DROP_OLDEST else DotBoundedBuffer.Policy.REFUSE
+		_queue.policy = GSBoundedBuffer.Policy.DROP_OLDEST if value == Policy.DROP_OLDEST else GSBoundedBuffer.Policy.REFUSE
 
-# The storage, bounds and counters live in the shared DotBoundedBuffer; this class adds the byte estimate and the drop notice.
-var _queue: DotBoundedBuffer = DotBoundedBuffer.new()
+# The storage, bounds and counters live in the shared GSBoundedBuffer; this class adds the byte estimate and the drop notice.
+var _queue: GSBoundedBuffer = GSBoundedBuffer.new()
 var _drops_seen: int = 0
 var _first_drop_ms: int = 0
 
@@ -93,13 +93,13 @@ func dropped() -> int:
 
 
 ## A record describing the drops since the last call, and resets the count.
-## Returned rather than logged: a log call from in here is the reentrancy [DotLogRouter] guards against.
+## Returned rather than logged: a log call from in here is the reentrancy [GSLogRouter] guards against.
 func drain_drop_notice() -> Dictionary:
 	if dropped() <= 0:
 		return {}
 
-	var notice: Dictionary = DotLogEvent.synthetic(
-		DotLog.Level.WARN,
+	var notice: Dictionary = GSLogEvent.synthetic(
+		GSLog.Level.WARN,
 		CHANNEL,
 		"log records were dropped; the buffer was full",
 		{

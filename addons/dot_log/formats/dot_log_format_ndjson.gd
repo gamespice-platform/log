@@ -1,6 +1,6 @@
 @tool
-class_name DotLogFormatNdjson
-extends DotLogFormat
+class_name GSLogFormatNdjson
+extends GSLogFormat
 
 ## One JSON object per line: the format everything that is not a hosted service accepts.
 ## Reach for it first, and test against it: a failure is readable with [code]tail[/code].
@@ -36,12 +36,12 @@ func build(events: Array, context: Dictionary) -> PackedByteArray:
 	if as_array:
 		var rows: Array = []
 		for event: Dictionary in events:
-			rows.append(DotLogEvent.flatten(event, context, field_prefix))
+			rows.append(GSLogEvent.flatten(event, context, field_prefix))
 		return JSON.stringify(rows).to_utf8_buffer()
 
 	var lines: PackedStringArray = PackedStringArray()
 	for event: Dictionary in events:
-		lines.append(DotLogEvent.flatten_json(event, context, field_prefix))
+		lines.append(GSLogEvent.flatten_json(event, context, field_prefix))
 
 	# A trailing newline, not a separator: a receiver reading line by line needs the
 	# last record terminated, and one that splits on newlines ignores the empty tail.

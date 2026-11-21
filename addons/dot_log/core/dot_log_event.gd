@@ -1,8 +1,8 @@
-class_name DotLogEvent
+class_name GSLogEvent
 extends RefCounted
 
 ## One log record, on its way out of the process.
-## Converts [DotLog]'s record into a shippable event (wall-clock time, stable order, JSON-safe values).
+## Converts [GSLog]'s record into a shippable event (wall-clock time, stable order, JSON-safe values).
 ## Static, and nothing here mutates the record: sinks share one [Dictionary].
 
 ## Severity numbers the shippers want, none of which agree with each other.
@@ -22,7 +22,7 @@ const SYSLOG_SEVERITY: Array[int] = [
 const OTLP_SEVERITY: Array[int] = [1, 5, 9, 13, 17, 21, 0]
 
 ## The lowercase names most JSON collectors index on. Deliberately not
-## [member DotLog.LEVEL_NAMES], which is uppercase because it is a console column.
+## [member GSLog.LEVEL_NAMES], which is uppercase because it is a console column.
 const SEVERITY_NAMES: Array[String] = [
 	"trace", "debug", "info", "warning", "error", "fatal", "off",
 ]
@@ -52,20 +52,20 @@ static func resync_clock() -> void:
 	_ensure_epoch()
 
 
-## Turns a [DotLog] record into a shippable event.
+## Turns a [GSLog] record into a shippable event.
 ## Adds [code]time_ms[/code], [code]seq[/code] and [code]severity[/code]; everything else arrives unchanged.
 static func from_record(record: Dictionary) -> Dictionary:
 	_ensure_epoch()
 	_seq += 1
 
-	var level: int = int(record.get("level", DotLog.Level.INFO))
+	var level: int = int(record.get("level", GSLog.Level.INFO))
 	var ticks: int = int(record.get("ticks_ms", Time.get_ticks_msec()))
 
 	return {
 		"level": level,
-		"level_name": String(record.get("level_name", DotLog.level_name(level))),
+		"level_name": String(record.get("level_name", GSLog.level_name(level))),
 		"severity": severity_name(level),
-		"channel": DotLog.display_channel(String(record.get("channel", ""))),
+		"channel": GSLog.display_channel(String(record.get("channel", ""))),
 		"message": String(record.get("message", "")),
 		"fields": record.get("fields", {}),
 		"ticks_ms": ticks,
@@ -75,13 +75,13 @@ static func from_record(record: Dictionary) -> Dictionary:
 
 
 ## A synthetic event, for the records this addon generates about itself.
-## Used for repeat summaries and drop notices, which must not go back through [DotLog].
+## Used for repeat summaries and drop notices, which must not go back through [GSLog].
 static func synthetic(
 	level: int, channel: String, message: String, fields: Dictionary = {}
 ) -> Dictionary:
 	return from_record({
 		"level": level,
-		"level_name": DotLog.level_name(level),
+		"level_name": GSLog.level_name(level),
 		"channel": channel,
 		"message": message,
 		"fields": fields,
@@ -206,8 +206,8 @@ static func text_line(event: Dictionary, with_time: bool = true) -> String:
 	if with_time:
 		parts.append(iso8601(event))
 	# level_column, not LEVEL_TAGS: the level is always printed, and how wide it is
-	# printed is DotLog's decision so that every line in a process matches.
-	parts.append(DotLog.level_column(clampi(int(event.get("level", 2)), 0, 6)))
+	# printed is GSLog's decision so that every line in a process matches.
+	parts.append(GSLog.level_column(clampi(int(event.get("level", 2)), 0, 6)))
 
 	var channel: String = String(event.get("channel", ""))
 	if channel != "":
@@ -217,7 +217,7 @@ static func text_line(event: Dictionary, with_time: bool = true) -> String:
 
 	var fields: Dictionary = event.get("fields", {})
 	if not fields.is_empty():
-		parts.append(DotLog.format_fields(fields))
+		parts.append(GSLog.format_fields(fields))
 
 	return " ".join(parts)
 

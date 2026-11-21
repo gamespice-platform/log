@@ -1,8 +1,8 @@
 @tool
-class_name DotLogTargetHttp
-extends DotLogTarget
+class_name GSLogTargetHttp
+extends GSLogTarget
 
-## Ships records to a collector over HTTP, in batches, with a [DotLogFormat] deciding the bytes.
+## Ships records to a collector over HTTP, in batches, with a [GSLogFormat] deciding the bytes.
 ## Owns the bounded queue, batching, one request in flight, retry with back-off and a circuit breaker; knows nothing of any service.
 ## HTTP is the only transport a browser has. Rationale for the three behaviours is in docs/design.md.
 
@@ -13,13 +13,13 @@ const SELF_CHANNEL := "log.http"
 @export var endpoint: String = ""
 
 ## How the batch is written. Without one, nothing is sent.
-@export var format: DotLogFormat = null
+@export var format: GSLogFormat = null
 
 ## Records per request, capped by the format's own limit.
 @export_range(1, 5000, 1) var batch_size: int = 100
 
 ## Records held while the collector is unreachable.
-## About 4 MB of typical records; when full the oldest go (see [DotLogBuffer]).
+## About 4 MB of typical records; when full the oldest go (see [GSLogBuffer]).
 @export_range(16, 500000, 16) var max_queued: int = 8192
 
 ## Seconds a request may take before it is abandoned.
@@ -33,16 +33,16 @@ const SELF_CHANNEL := "log.http"
 
 ## Send immediately when a record at this level or above arrives.
 ## A crash report that waits for the flush interval never arrives. FATAL by default; ERROR for a client build.
-@export var send_immediately_above: DotLog.Level = DotLog.Level.FATAL
+@export var send_immediately_above: GSLog.Level = GSLog.Level.FATAL
 
-## The HTTP node. Created by the router, which parents it — [DotHttp] is a [Node] and its
+## The HTTP node. Created by the router, which parents it — [GSHttp] is a [Node] and its
 ## retry timer needs a tree.
-var http: DotHttp = null
+var http: GSHttp = null
 
 ## Where breadcrumbs come from, handed to an error-tracking format that wants them.
-var breadcrumb_source: DotLogTargetMemory = null
+var breadcrumb_source: GSLogTargetMemory = null
 
-var _buffer: DotLogBuffer = null
+var _buffer: GSLogBuffer = null
 var _context: Dictionary = {}
 var _sending: bool = false
 var _consecutive_failures: int = 0
@@ -53,40 +53,40 @@ var _rejected: int = 0
 var _urgent: bool = false
 
 
-func _init(p_format: DotLogFormat = null, p_endpoint: String = "") -> void:
+func _init(p_format: GSLogFormat = null, p_endpoint: String = "") -> void:
 	target_name = "http"
 	format = p_format
 	if p_endpoint != "":
 		endpoint = p_endpoint
-	_buffer = DotLogBuffer.new(max_queued, DotLogBuffer.Policy.DROP_OLDEST)
+	_buffer = GSLogBuffer.new(max_queued, GSLogBuffer.Policy.DROP_OLDEST)
 
 
 func set_context(context: Dictionary) -> void:
 	_context = context
 
 
-func open() -> DotResult:
+func open() -> GSResult:
 	if format == null:
-		return DotResult.fail(
-			DotError.CODE_STATE, "The HTTP log target has no format."
+		return GSResult.fail(
+			GSError.CODE_STATE, "The HTTP log target has no format."
 		)
 
 	if resolved_endpoint() == "":
-		return DotResult.fail(
-			DotError.CODE_STATE,
+		return GSResult.fail(
+			GSError.CODE_STATE,
 			"The HTTP log target has no endpoint.",
 			"set `endpoint`, or a DSN on the format"
 		)
 
 	if http == null:
-		return DotResult.fail(
-			DotError.CODE_STATE,
-			"The HTTP log target has no DotHttp node.",
+		return GSResult.fail(
+			GSError.CODE_STATE,
+			"The HTTP log target has no GSHttp node.",
 			"the router assigns one; a target used standalone must be given one"
 		)
 
 	http.timeout_sec = timeout_sec
-	# Retries are this target's job, not DotHttp's. Two layers of back-off multiply,
+	# Retries are this target's job, not GSHttp's. Two layers of back-off multiply,
 	# and the outer one is the one that can drop a batch it knows will never land.
 	http.max_retries = 0
 
@@ -97,7 +97,7 @@ func open() -> DotResult:
 			format.set("breadcrumb_source", breadcrumb_source)
 
 	_opened = true
-	return DotResult.success(resolved_endpoint())
+	return GSResult.success(resolved_endpoint())
 
 
 func close() -> void:
@@ -112,7 +112,7 @@ func accepts(event: Dictionary) -> bool:
 	# a gate it would take everything, which is the expensive mistake — so the absence
 	# of one means WARN and above rather than everything.
 	if format != null and format.is_error_tracker() and gate == null:
-		return int(event.get("level", DotLog.Level.INFO)) >= DotLog.Level.WARN
+		return int(event.get("level", GSLog.Level.INFO)) >= GSLog.Level.WARN
 
 	return true
 
@@ -121,7 +121,7 @@ func write(event: Dictionary) -> void:
 	super(event)
 	_buffer.push(event)
 
-	if int(event.get("level", DotLog.Level.INFO)) >= send_immediately_above:
+	if int(event.get("level", GSLog.Level.INFO)) >= send_immediately_above:
 		_urgent = true
 
 
@@ -138,22 +138,22 @@ func wants_flush() -> bool:
 	return _urgent or _buffer.size() >= batch_size
 
 
-func flush() -> DotResult:
+func flush() -> GSResult:
 	_urgent = false
 
 	if not _opened or format == null or _buffer.is_empty():
-		return DotResult.success(0)
+		return GSResult.success(0)
 
 	if _sending:
-		return DotResult.success(0)
+		return GSResult.success(0)
 
 	var now: int = Time.get_ticks_msec()
 	if now < _circuit_open_until_ms:
-		return DotResult.success(0)
+		return GSResult.success(0)
 
 	_sending = true
 	var total: int = 0
-	var last: DotResult = DotResult.success(0)
+	var last: GSResult = GSResult.success(0)
 
 	# One batch per flush, not a loop until empty: a backlog of ten thousand records
 	# against a slow collector would otherwise hold this coroutine open across many
@@ -167,10 +167,10 @@ func flush() -> DotResult:
 			total = batch.size()
 
 	_sending = false
-	return last if not last.ok else DotResult.success(total)
+	return last if not last.ok else GSResult.success(total)
 
 
-func _send(batch: Array[Dictionary]) -> DotResult:
+func _send(batch: Array[Dictionary]) -> GSResult:
 	var body: PackedByteArray = format.build(batch, _context)
 
 	var cap: int = format.max_bytes()
@@ -185,17 +185,17 @@ func _send(batch: Array[Dictionary]) -> DotResult:
 	var headers: Dictionary = format.headers()
 	headers["Content-Type"] = format.content_type()
 
-	var res: DotResult = await http.request(
+	var res: GSResult = await http.request(
 		HTTPClient.METHOD_POST, resolved_endpoint(), body, headers, true
 	)
 
 	if res.ok:
-		var verdict: DotResult = format.interpret(res.value)
+		var verdict: GSResult = format.interpret(res.value)
 		if verdict.ok:
 			_consecutive_failures = 0
 			_sent_batches += 1
 			_sent_records += batch.size()
-			return DotResult.success(batch.size())
+			return GSResult.success(batch.size())
 		res = verdict
 
 	# From here the send failed, and the only question is whether these bytes could ever
@@ -226,9 +226,9 @@ func _send(batch: Array[Dictionary]) -> DotResult:
 
 
 ## Whether these exact bytes could ever be accepted.
-## Not [method DotResult.is_retryable]: GameSpice Core maps unknown non-2xx to a retryable CODE_HTTP, but nobody will fix a refused batch, so it would block the queue forever.
+## Not [method GSResult.is_retryable]: GameSpice Core maps unknown non-2xx to a retryable CODE_HTTP, but nobody will fix a refused batch, so it would block the queue forever.
 ## A 4xx means refused except 408 and 429; a 5xx or transport failure is worth another go.
-func _worth_retrying(res: DotResult) -> bool:
+func _worth_retrying(res: GSResult) -> bool:
 	if res == null or res.error == null:
 		return false
 

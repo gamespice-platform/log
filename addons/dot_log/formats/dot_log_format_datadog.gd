@@ -1,6 +1,6 @@
 @tool
-class_name DotLogFormatDatadog
-extends DotLogFormat
+class_name GSLogFormatDatadog
+extends GSLogFormat
 
 ## Datadog's log intake.
 ## A JSON array, the key in [code]DD-API-KEY[/code], and reserved attributes [code]ddsource[/code], [code]service[/code], [code]ddtags[/code] (a comma string) and [code]status[/code] (a name it knows).
@@ -39,10 +39,10 @@ func build(events: Array, context: Dictionary) -> PackedByteArray:
 			"ddsource": ddsource,
 			"service": str(context.get("service", service)),
 			"ddtags": _tags_for(event, context),
-			"status": _status_for(int(event.get("level", DotLog.Level.INFO))),
+			"status": _status_for(int(event.get("level", GSLog.Level.INFO))),
 			"message": String(event.get("message", "")),
 			"channel": String(event.get("channel", "")),
-			"timestamp": DotLogEvent.time_ms(event),
+			"timestamp": GSLogEvent.time_ms(event),
 		}
 
 		if context.has("host"):
@@ -50,7 +50,7 @@ func build(events: Array, context: Dictionary) -> PackedByteArray:
 
 		var fields: Dictionary = event.get("fields", {})
 		for k: Variant in fields:
-			row[str(k)] = DotLogEvent.json_value(fields[k])
+			row[str(k)] = GSLogEvent.json_value(fields[k])
 
 		rows.append(row)
 
@@ -78,13 +78,13 @@ func _tags_for(event: Dictionary, context: Dictionary) -> String:
 ## Datadog's own level names. Anything else is read as `info`, silently.
 static func _status_for(level: int) -> String:
 	match level:
-		DotLog.Level.TRACE, DotLog.Level.DEBUG:
+		GSLog.Level.TRACE, GSLog.Level.DEBUG:
 			return "debug"
-		DotLog.Level.WARN:
+		GSLog.Level.WARN:
 			return "warning"
-		DotLog.Level.ERROR:
+		GSLog.Level.ERROR:
 			return "error"
-		DotLog.Level.FATAL:
+		GSLog.Level.FATAL:
 			return "critical"
 		_:
 			return "info"
@@ -102,18 +102,18 @@ func max_bytes() -> int:
 	return 5 * 1024 * 1024
 
 
-func interpret(response: Dictionary) -> DotResult:
+func interpret(response: Dictionary) -> GSResult:
 	var status: int = int(response.get("status", 0))
 	if status >= 200 and status < 300:
-		return DotResult.success(null)
+		return GSResult.success(null)
 
 	if status == 403:
-		return DotResult.fail(
-			DotError.CODE_AUTH,
+		return GSResult.fail(
+			GSError.CODE_AUTH,
 			"The log intake refused the API key.",
 			"a key from another region's account gets this, too"
 		)
 
-	return DotResult.failure(
-		DotError.from_http(status, String(response.get("body_text", "")))
+	return GSResult.failure(
+		GSError.from_http(status, String(response.get("body_text", "")))
 	)

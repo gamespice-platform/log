@@ -1,9 +1,9 @@
 @tool
-class_name DotLogConfig
-extends DotConfig
+class_name GSLogConfig
+extends GSConfig
 
 ## Logging as a deployment document: one flat file that builds the whole pipeline.
-## Layered like every [DotConfig]: defaults, JSON file, [code]DOT_LOG_*[/code] environment, [code]--log-*[/code] command line.
+## Layered like every [GSConfig]: defaults, JSON file, [code]DOT_LOG_*[/code] environment, [code]--log-*[/code] command line.
 ## [member remote_token] and [member sentry_dsn] are refused from environment and command line (see docs/design.md).
 
 ## The named levels, for the string-valued settings.
@@ -11,7 +11,7 @@ const LEVEL_KEYS: Array[String] = [
 	"trace", "debug", "info", "warn", "error", "fatal", "off",
 ]
 
-## The addon name [DotAddonConfig] turns into the folder `dot_log`.
+## The addon name [GSAddonConfig] turns into the folder `dot_log`.
 const CFG_ADDON := "dot-log"
 
 @export_group("Levels")
@@ -24,7 +24,7 @@ const CFG_ADDON := "dot-log"
 @export var channel_levels: PackedStringArray = PackedStringArray()
 
 ## The lowest level mirrored into the engine's own warning and error output.
-## [code]error[/code] suits a server: at [code]warn[/code] every warning carries an engine backtrace; see [member DotLogRouter.mirror_min_level].
+## [code]error[/code] suits a server: at [code]warn[/code] every warning carries an engine backtrace; see [member GSLogRouter.mirror_min_level].
 @export var mirror_min_level: String = "error"
 
 ## Print to stdout as well as to the targets. On: a supervisor captures stdout.
@@ -169,12 +169,12 @@ func sensitive_keys() -> PackedStringArray:
 ## Applies [param file_name] from `cfg/addons/dot_log/`, then the operator's `cfg/server/addons/dot_log/`.
 ## A flat [param legacy_dir]/[param file_name] is still read (one WARN) while no new copy exists.
 ## Secrets stay file-only: the environment and command line still refuse them.
-func apply_cfg_file(file_name: String = "log.yml", legacy_dir: String = "res://cfg") -> DotResult:
-	return DotAddonConfig.apply_file(CFG_ADDON, file_name, legacy_dir, apply_dictionary)
+func apply_cfg_file(file_name: String = "log.yml", legacy_dir: String = "res://cfg") -> GSResult:
+	return GSAddonConfig.apply_file(CFG_ADDON, file_name, legacy_dir, apply_dictionary)
 
 
-## [method apply_cfg_file], then `DOT_LOG_*`, `--log-*` and validation: [method DotConfig.load_layered] for the yml layout.
-func load_cfg(file_name: String = "log.yml", legacy_dir: String = "res://cfg") -> DotResult:
+## [method apply_cfg_file], then `DOT_LOG_*`, `--log-*` and validation: [method GSConfig.load_layered] for the yml layout.
+func load_cfg(file_name: String = "log.yml", legacy_dir: String = "res://cfg") -> GSResult:
 	unknown_keys = PackedStringArray()
 	var file_res := apply_cfg_file(file_name, legacy_dir)
 	if not file_res.ok:
@@ -184,21 +184,21 @@ func load_cfg(file_name: String = "log.yml", legacy_dir: String = "res://cfg") -
 	var valid := validate()
 	if not valid.ok:
 		return valid.wrap("Configuration is invalid.")
-	return DotResult.success(self)
+	return GSResult.success(self)
 
 
-func validate() -> DotResult:
+func validate() -> GSResult:
 	if parse_level(level) < 0:
-		return DotResult.fail(
-			DotError.CODE_INVALID, "Unknown log level '%s'." % level,
+		return GSResult.fail(
+			GSError.CODE_INVALID, "Unknown log level '%s'." % level,
 			"one of: " + ", ".join(LEVEL_KEYS)
 		)
 
 	for entry: String in channel_levels:
 		var parts: PackedStringArray = entry.split("=", false, 1)
 		if parts.size() != 2 or parse_level(parts[1]) < 0:
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"A channel level must be written channel=level.",
 				entry
 			)
@@ -206,61 +206,61 @@ func validate() -> DotResult:
 	if remote_enabled:
 		if remote_format == "sentry":
 			if sentry_dsn == "":
-				return DotResult.fail(
-					DotError.CODE_INVALID, "The sentry format needs a DSN."
+				return GSResult.fail(
+					GSError.CODE_INVALID, "The sentry format needs a DSN."
 				)
 		elif remote_url == "":
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"Remote logging is on but no collector URL was given.",
 				"set remote_url, or turn remote_enabled off"
 			)
 
 	if sql_enabled and dialect_of(sql_dialect) < 0:
-		return DotResult.fail(
-			DotError.CODE_INVALID, "Unknown SQL dialect '%s'." % sql_dialect,
+		return GSResult.fail(
+			GSError.CODE_INVALID, "Unknown SQL dialect '%s'." % sql_dialect,
 			"sqlite, postgres or mysql"
 		)
 
 	if remote_enabled and make_format() == null:
-		return DotResult.fail(
-			DotError.CODE_INVALID, "Unknown log format '%s'." % remote_format,
+		return GSResult.fail(
+			GSError.CODE_INVALID, "Unknown log format '%s'." % remote_format,
 			"ndjson, loki, elasticsearch, splunk, datadog, seq, gelf, otlp, sentry"
 		)
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 ## Builds the router this document describes, without starting it.
 ## The caller adds it to the tree, which starts it, so a host can add a target or set the context first.
-func build_router() -> DotLogRouter:
-	var router: DotLogRouter = DotLogRouter.new()
-	router.name = "DotLogRouter"
+func build_router() -> GSLogRouter:
+	var router: GSLogRouter = GSLogRouter.new()
+	router.name = "GSLogRouter"
 	router.flush_interval_sec = flush_interval_sec
 	router.stdout_on_start = 1 if stdout else 0
 	router.mirror_min_level = maxi(0, parse_level(mirror_min_level))
 	router.context = context_tags()
 
 	if redact_enabled:
-		var redactor: DotLogRedactor = DotLogRedactor.new()
+		var redactor: GSLogRedactor = GSLogRedactor.new()
 		redactor.mask_ip_addresses = redact_ips
 		redactor.mask_emails = redact_emails
 		redactor.drop_keys = redact_drop_keys
 		router.redactor = redactor
 
 	if dedupe_window_sec > 0.0 or per_channel_rate > 0.0:
-		var gate: DotLogGate = DotLogGate.new()
+		var gate: GSLogGate = GSLogGate.new()
 		gate.dedupe_window_sec = dedupe_window_sec
 		gate.per_channel_rate = per_channel_rate
 		router.gate = gate
 
-	var memory: DotLogTargetMemory = null
+	var memory: GSLogTargetMemory = null
 	if memory_enabled:
-		memory = DotLogTargetMemory.new(memory_capacity)
+		memory = GSLogTargetMemory.new(memory_capacity)
 		router.targets.append(memory)
 
 	if file_enabled:
-		var file: DotLogTargetFile = DotLogTargetFile.new(file_directory, file_basename)
+		var file: GSLogTargetFile = GSLogTargetFile.new(file_directory, file_basename)
 		file.json_lines = file_json
 		file.max_file_bytes = file_max_bytes
 		file.max_files = file_max_files
@@ -269,20 +269,20 @@ func build_router() -> DotLogRouter:
 		router.targets.append(file)
 
 	if syslog_enabled:
-		var syslog: DotLogTargetSyslog = DotLogTargetSyslog.new(syslog_host, syslog_port)
+		var syslog: GSLogTargetSyslog = GSLogTargetSyslog.new(syslog_host, syslog_port)
 		syslog.transport = (
-			DotLogTargetSyslog.Transport.TCP
+			GSLogTargetSyslog.Transport.TCP
 			if syslog_tcp
-			else DotLogTargetSyslog.Transport.UDP
+			else GSLogTargetSyslog.Transport.UDP
 		)
 		syslog.app_name = syslog_app
 		syslog.gate = _gate_at(syslog_level)
 		router.targets.append(syslog)
 
 	if remote_enabled:
-		var format: DotLogFormat = make_format()
+		var format: GSLogFormat = make_format()
 		if format != null:
-			var remote: DotLogTargetHttp = DotLogTargetHttp.new(format, remote_url)
+			var remote: GSLogTargetHttp = GSLogTargetHttp.new(format, remote_url)
 			remote.target_name = remote_format
 			remote.batch_size = remote_batch
 			remote.gate = _gate_at(remote_level)
@@ -295,8 +295,8 @@ func build_router() -> DotLogRouter:
 		# The driver is not built here: it is a GDExtension this addon cannot name, and
 		# the host assigns it. The target reports itself unopened until it has one,
 		# which is a clearer failure than a silent no-op.
-		var sql: DotLogTargetSql = DotLogTargetSql.new(null, sql_table)
-		sql.dialect = dialect_of(sql_dialect) as DotLogSqlSchema.Dialect
+		var sql: GSLogTargetSql = GSLogTargetSql.new(null, sql_table)
+		sql.dialect = dialect_of(sql_dialect) as GSLogSqlSchema.Dialect
 		sql.retention_days = sql_retention_days
 		sql.gate = _gate_at(sql_level)
 		router.targets.append(sql)
@@ -304,10 +304,10 @@ func build_router() -> DotLogRouter:
 	return router
 
 
-## Applies the level settings to [DotLog] itself. Called separately from
+## Applies the level settings to [GSLog] itself. Called separately from
 ## [method build_router], because a process may want the levels without the targets.
 func apply_levels() -> void:
-	DotLog.set_level(maxi(0, parse_level(level)))
+	GSLog.set_level(maxi(0, parse_level(level)))
 
 	for entry: String in channel_levels:
 		var parts: PackedStringArray = entry.split("=", false, 1)
@@ -315,7 +315,7 @@ func apply_levels() -> void:
 			continue
 		var parsed: int = parse_level(parts[1])
 		if parsed >= 0:
-			DotLog.set_channel_level(parts[0].strip_edges(), parsed)
+			GSLog.set_channel_level(parts[0].strip_edges(), parsed)
 
 
 ## The context tags, with anything empty left out.
@@ -335,48 +335,48 @@ func context_tags() -> Dictionary:
 
 
 ## A format object for [member remote_format], or null if the name is unknown.
-func make_format() -> DotLogFormat:
+func make_format() -> GSLogFormat:
 	match remote_format.to_lower():
 		"ndjson", "json", "http":
-			var ndjson: DotLogFormatNdjson = DotLogFormatNdjson.new()
+			var ndjson: GSLogFormatNdjson = GSLogFormatNdjson.new()
 			ndjson.token = remote_token
 			return ndjson
 		"loki", "grafana":
-			var loki: DotLogFormatLoki = DotLogFormatLoki.new()
+			var loki: GSLogFormatLoki = GSLogFormatLoki.new()
 			loki.token = remote_token
 			loki.static_labels = _tag_dictionary()
 			return loki
 		"elastic", "elasticsearch", "opensearch":
-			var elastic: DotLogFormatElastic = DotLogFormatElastic.new()
+			var elastic: GSLogFormatElastic = GSLogFormatElastic.new()
 			elastic.token = remote_token
 			return elastic
 		"splunk", "hec":
-			var splunk: DotLogFormatSplunk = DotLogFormatSplunk.new()
+			var splunk: GSLogFormatSplunk = GSLogFormatSplunk.new()
 			splunk.token = remote_token
 			return splunk
 		"datadog", "dd":
-			var datadog: DotLogFormatDatadog = DotLogFormatDatadog.new()
+			var datadog: GSLogFormatDatadog = GSLogFormatDatadog.new()
 			datadog.token = remote_token
 			datadog.tags = _tag_dictionary()
 			if service != "":
 				datadog.service = service
 			return datadog
 		"seq", "clef":
-			var seq: DotLogFormatSeq = DotLogFormatSeq.new()
+			var seq: GSLogFormatSeq = GSLogFormatSeq.new()
 			seq.token = remote_token
 			return seq
 		"gelf", "graylog":
-			var gelf: DotLogFormatGelf = DotLogFormatGelf.new()
+			var gelf: GSLogFormatGelf = GSLogFormatGelf.new()
 			gelf.token = remote_token
 			return gelf
 		"otlp", "opentelemetry", "otel":
-			var otlp: DotLogFormatOtlp = DotLogFormatOtlp.new()
+			var otlp: GSLogFormatOtlp = GSLogFormatOtlp.new()
 			otlp.token = remote_token
 			if service != "":
 				otlp.service_name = service
 			return otlp
 		"sentry":
-			var sentry: DotLogFormatSentry = DotLogFormatSentry.new()
+			var sentry: GSLogFormatSentry = GSLogFormatSentry.new()
 			sentry.dsn = sentry_dsn
 			sentry.tags = _tag_dictionary()
 			sentry.release = version
@@ -394,14 +394,14 @@ func _tag_dictionary() -> Dictionary:
 	return out
 
 
-func _gate_at(level_name: String) -> DotLogGate:
-	var gate: DotLogGate = DotLogGate.new()
-	gate.min_level = maxi(0, parse_level(level_name)) as DotLog.Level
+func _gate_at(level_name: String) -> GSLogGate:
+	var gate: GSLogGate = GSLogGate.new()
+	gate.min_level = maxi(0, parse_level(level_name)) as GSLog.Level
 	return gate
 
 
-## A level name to a [enum DotLog.Level], or -1.
-## Wraps [method DotLog.parse_level] only to accept the short spellings a config file uses.
+## A level name to a [enum GSLog.Level], or -1.
+## Wraps [method GSLog.parse_level] only to accept the short spellings a config file uses.
 static func parse_level(name: String) -> int:
 	var trimmed: String = name.strip_edges().to_lower()
 	if trimmed == "warning":
@@ -409,17 +409,17 @@ static func parse_level(name: String) -> int:
 	var index: int = LEVEL_KEYS.find(trimmed)
 	if index >= 0:
 		return index
-	return DotLog.parse_level(name)
+	return GSLog.parse_level(name)
 
 
 static func dialect_of(name: String) -> int:
 	match name.strip_edges().to_lower():
 		"sqlite", "sqlite3":
-			return DotLogSqlSchema.Dialect.SQLITE
+			return GSLogSqlSchema.Dialect.SQLITE
 		"postgres", "postgresql", "psql":
-			return DotLogSqlSchema.Dialect.POSTGRES
+			return GSLogSqlSchema.Dialect.POSTGRES
 		"mysql", "mariadb":
-			return DotLogSqlSchema.Dialect.MYSQL
+			return GSLogSqlSchema.Dialect.MYSQL
 		_:
 			return -1
 

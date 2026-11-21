@@ -5,10 +5,10 @@ extends "log_selftest_base.gd"
 func _test_format_ndjson() -> void:
 	_section("format: ndjson")
 
-	var format: DotLogFormatNdjson = DotLogFormatNdjson.new()
+	var format: GSLogFormatNdjson = GSLogFormatNdjson.new()
 	format.token = "secret"
 	var body: String = format.build(
-		[_event(DotLog.Level.INFO, "net", "one"), _event(DotLog.Level.WARN, "net", "two")],
+		[_event(GSLog.Level.INFO, "net", "one"), _event(GSLog.Level.WARN, "net", "two")],
 		{"service": "fc"}
 	).get_string_from_utf8()
 
@@ -32,14 +32,14 @@ func _test_format_ndjson() -> void:
 func _test_format_loki() -> void:
 	_section("format: loki")
 
-	var format: DotLogFormatLoki = DotLogFormatLoki.new()
+	var format: GSLogFormatLoki = GSLogFormatLoki.new()
 	format.token = "t"
 	format.tenant = "tmc"
 
 	var body: Variant = _parse(format.build([
-		_event(DotLog.Level.INFO, "player.roster", "joined", {"peer": 4}),
-		_event(DotLog.Level.INFO, "player.roster", "left"),
-		_event(DotLog.Level.ERROR, "net", "dropped"),
+		_event(GSLog.Level.INFO, "player.roster", "joined", {"peer": 4}),
+		_event(GSLog.Level.INFO, "player.roster", "left"),
+		_event(GSLog.Level.ERROR, "net", "dropped"),
 	], {"service": "fc", "env": "prod"}).get_string_from_utf8())
 
 	_check("the payload has streams", typeof(body) == TYPE_DICTIONARY and (body as Dictionary).has("streams"))
@@ -63,8 +63,8 @@ func _test_format_loki() -> void:
 	_check("a username makes it basic auth", str(format.headers()["Authorization"]).begins_with("Basic "))
 
 	_check("a 204 is success", format.interpret({"status": 204}).ok)
-	var bad: DotResult = format.interpret({"status": 400, "body_text": "entry out of order"})
-	_check("a 400 is invalid, not retryable", not bad.ok and bad.code() == DotError.CODE_INVALID and not bad.is_retryable())
+	var bad: GSResult = format.interpret({"status": 400, "body_text": "entry out of order"})
+	_check("a 400 is invalid, not retryable", not bad.ok and bad.code() == GSError.CODE_INVALID and not bad.is_retryable())
 	_check("a 503 is retryable", format.interpret({"status": 503, "body_text": ""}).is_retryable())
 
 	_line("")
@@ -74,11 +74,11 @@ func _test_format_loki() -> void:
 func _test_format_elastic() -> void:
 	_section("format: elasticsearch")
 
-	var format: DotLogFormatElastic = DotLogFormatElastic.new()
+	var format: GSLogFormatElastic = GSLogFormatElastic.new()
 	format.index = "dot-logs-%Y.%m.%d"
 	format.token = "k"
 
-	var body: String = format.build([_event(DotLog.Level.WARN, "net", "one", {"peer": 4})], {"service": "fc"}).get_string_from_utf8()
+	var body: String = format.build([_event(GSLog.Level.WARN, "net", "one", {"peer": 4})], {"service": "fc"}).get_string_from_utf8()
 	var lines: PackedStringArray = body.split("\n", false)
 	_check("an action line and a document line", lines.size() == 2, null, body)
 
@@ -101,7 +101,7 @@ func _test_format_elastic() -> void:
 
 	_check("a 200 with no errors is success", format.interpret({"status": 200, "body_text": "{\"errors\":false,\"took\":4}"}).ok)
 
-	var rejected: DotResult = format.interpret({
+	var rejected: GSResult = format.interpret({
 		"status": 200,
 		"body_text": "{\"errors\":true,\"items\":[{\"index\":{\"status\":400,\"error\":{\"type\":\"mapper_parsing_exception\",\"reason\":\"failed to parse\"}}}]}",
 	})
@@ -119,11 +119,11 @@ func _test_format_elastic() -> void:
 func _test_format_splunk() -> void:
 	_section("format: splunk")
 
-	var format: DotLogFormatSplunk = DotLogFormatSplunk.new()
+	var format: GSLogFormatSplunk = GSLogFormatSplunk.new()
 	format.token = "hec-token"
 	format.splunk_index = "games"
 
-	var body: String = format.build([_event(DotLog.Level.INFO, "net", "one", {"peer": 4})], {"service": "fc", "host": "eu-1"}).get_string_from_utf8()
+	var body: String = format.build([_event(GSLog.Level.INFO, "net", "one", {"peer": 4})], {"service": "fc", "host": "eu-1"}).get_string_from_utf8()
 	var doc: Dictionary = _parse(body.split("\n", false)[0])
 
 	_check("the time is seconds, not milliseconds", float(doc["time"]) < 100000000000.0, null, str(doc["time"]))
@@ -139,8 +139,8 @@ func _test_format_splunk() -> void:
 
 	_check("a 200 with code 0 is success", format.interpret({"status": 200, "body_text": "{\"text\":\"Success\",\"code\":0}"}).ok)
 	_check("a 200 with a non-zero code is not", not format.interpret({"status": 200, "body_text": "{\"text\":\"No data\",\"code\":5}"}).ok)
-	var auth: DotResult = format.interpret({"status": 403, "body_text": ""})
-	_check("a 403 says the token was refused", not auth.ok and auth.code() == DotError.CODE_AUTH)
+	var auth: GSResult = format.interpret({"status": 403, "body_text": ""})
+	_check("a 403 says the token was refused", not auth.ok and auth.code() == GSError.CODE_AUTH)
 
 	_line("")
 	_done()
@@ -149,12 +149,12 @@ func _test_format_splunk() -> void:
 func _test_format_datadog() -> void:
 	_section("format: datadog")
 
-	var format: DotLogFormatDatadog = DotLogFormatDatadog.new()
+	var format: GSLogFormatDatadog = GSLogFormatDatadog.new()
 	format.token = "dd"
 	format.tags = {"region": "eu"}
 
 	var rows: Variant = _parse(format.build([
-		_event(DotLog.Level.WARN, "net", "one", {"peer": 4})
+		_event(GSLog.Level.WARN, "net", "one", {"peer": 4})
 	], {"service": "fc", "env": "prod", "host": "eu-1"}).get_string_from_utf8())
 
 	_check("the payload is an array", typeof(rows) == TYPE_ARRAY)
@@ -169,8 +169,8 @@ func _test_format_datadog() -> void:
 	_check("ddsource is not an integration name", str(row["ddsource"]) == "dot")
 
 	_check("the key goes in DD-API-KEY", str(format.headers()["DD-API-KEY"]) == "dd")
-	_check("a fatal record is critical", str(((_parse(format.build([_event(DotLog.Level.FATAL)], {}).get_string_from_utf8()) as Array)[0] as Dictionary)["status"]) == "critical")
-	var forbidden: DotResult = format.interpret({"status": 403, "body_text": ""})
+	_check("a fatal record is critical", str(((_parse(format.build([_event(GSLog.Level.FATAL)], {}).get_string_from_utf8()) as Array)[0] as Dictionary)["status"]) == "critical")
+	var forbidden: GSResult = format.interpret({"status": 403, "body_text": ""})
 	_check("a 403 mentions the region", not forbidden.ok and forbidden.error.detail.contains("region"))
 
 	_line("")
@@ -180,11 +180,11 @@ func _test_format_datadog() -> void:
 func _test_format_seq() -> void:
 	_section("format: seq")
 
-	var format: DotLogFormatSeq = DotLogFormatSeq.new()
+	var format: GSLogFormatSeq = GSLogFormatSeq.new()
 	format.token = "seq-key"
 
 	var body: String = format.build([
-		_event(DotLog.Level.WARN, "net", "player connected", {"peer": 4, "@t": "sneaky"})
+		_event(GSLog.Level.WARN, "net", "player connected", {"peer": 4, "@t": "sneaky"})
 	], {"service": "fc"}).get_string_from_utf8()
 	var doc: Dictionary = _parse(body.split("\n", false)[0])
 
@@ -197,16 +197,16 @@ func _test_format_seq() -> void:
 	_check("the context is too", str(doc["service"]) == "fc")
 	_check("the channel is a property", str(doc["Channel"]) == "net")
 
-	var info: Dictionary = _parse(format.build([_event(DotLog.Level.INFO)], {}).get_string_from_utf8().split("\n", false)[0])
+	var info: Dictionary = _parse(format.build([_event(GSLog.Level.INFO)], {}).get_string_from_utf8().split("\n", false)[0])
 	_check("an info record sends no level, which is the CLEF default", not info.has("@l"))
 
 	format.use_template = false
-	var rendered: Dictionary = _parse(format.build([_event(DotLog.Level.INFO, "net", "x", {"a": 1})], {}).get_string_from_utf8().split("\n", false)[0])
+	var rendered: Dictionary = _parse(format.build([_event(GSLog.Level.INFO, "net", "x", {"a": 1})], {}).get_string_from_utf8().split("\n", false)[0])
 	_check("templates can be turned off", rendered.has("@m") and not rendered.has("@mt"))
 
 	_check("the key header is Seq's", str(format.headers()["X-Seq-ApiKey"]) == "seq-key")
 	_check("the content type is CLEF", format.content_type() == "application/vnd.serilog.clef")
-	_check("a 400 is invalid", format.interpret({"status": 400, "body_text": "bad"}).code() == DotError.CODE_INVALID)
+	_check("a 400 is invalid", format.interpret({"status": 400, "body_text": "bad"}).code() == GSError.CODE_INVALID)
 
 	_line("")
 	_done()
@@ -215,9 +215,9 @@ func _test_format_seq() -> void:
 func _test_format_gelf() -> void:
 	_section("format: gelf")
 
-	var format: DotLogFormatGelf = DotLogFormatGelf.new()
+	var format: GSLogFormatGelf = GSLogFormatGelf.new()
 	var doc: Dictionary = format.message_for(
-		_event(DotLog.Level.ERROR, "net", "dropped", {"peer": 4, "id": "x", "_already": 1}),
+		_event(GSLog.Level.ERROR, "net", "dropped", {"peer": 4, "id": "x", "_already": 1}),
 		{"service": "fc", "host": "eu-1"}
 	)
 
@@ -231,7 +231,7 @@ func _test_format_gelf() -> void:
 	_check("an already-prefixed field is not doubled", doc.has("_already"))
 	_check("the context is a field", str(doc["_service"]) == "fc")
 
-	var empty: Dictionary = format.message_for(_event(DotLog.Level.INFO, "net", ""), {})
+	var empty: Dictionary = format.message_for(_event(GSLog.Level.INFO, "net", ""), {})
 	_check("an empty message gets a placeholder, because empty is rejected", str(empty["short_message"]) != "")
 
 	var body: String = format.build([_event(), _event()], {}).get_string_from_utf8()
@@ -249,9 +249,9 @@ func _test_format_gelf() -> void:
 func _test_format_otlp() -> void:
 	_section("format: otlp")
 
-	var format: DotLogFormatOtlp = DotLogFormatOtlp.new()
+	var format: GSLogFormatOtlp = GSLogFormatOtlp.new()
 	var body: Variant = _parse(format.build([
-		_event(DotLog.Level.ERROR, "net", "dropped", {"peer": 4, "ratio": 0.5, "ok": true})
+		_event(GSLog.Level.ERROR, "net", "dropped", {"peer": 4, "ratio": 0.5, "ok": true})
 	], {"service": "fc", "env": "prod", "version": "1.2.3"}).get_string_from_utf8())
 
 	_check("the payload is resourceLogs", typeof(body) == TYPE_DICTIONARY and (body as Dictionary).has("resourceLogs"))
@@ -280,7 +280,7 @@ func _test_format_otlp() -> void:
 
 	_check("the path is the logs endpoint", format.default_path() == "/v1/logs")
 
-	var partial: DotResult = format.interpret({
+	var partial: GSResult = format.interpret({
 		"status": 200,
 		"body_text": "{\"partialSuccess\":{\"rejectedLogRecords\":2,\"errorMessage\":\"too old\"}}",
 	})
@@ -294,7 +294,7 @@ func _test_format_otlp() -> void:
 func _test_format_sentry() -> void:
 	_section("format: sentry")
 
-	var format: DotLogFormatSentry = DotLogFormatSentry.new()
+	var format: GSLogFormatSentry = GSLogFormatSentry.new()
 	format.dsn = "https://abc123@o1.ingest.example.com/4505"
 	format.release = "1.2.3"
 
@@ -303,13 +303,13 @@ func _test_format_sentry() -> void:
 	_check("the auth header carries the public key", str(format.headers()["X-Sentry-Auth"]).contains("sentry_key=abc123"))
 	_check("and names the client", str(format.headers()["X-Sentry-Auth"]).contains("dot-log"))
 
-	var memory: DotLogTargetMemory = DotLogTargetMemory.new(8)
+	var memory: GSLogTargetMemory = GSLogTargetMemory.new(8)
 	memory.open()
-	memory.write(_event(DotLog.Level.INFO, "net", "before the error"))
+	memory.write(_event(GSLog.Level.INFO, "net", "before the error"))
 	format.breadcrumb_source = memory
 
 	var body: String = format.build([
-		_event(DotLog.Level.ERROR, "net", "it broke", {"peer": 4})
+		_event(GSLog.Level.ERROR, "net", "it broke", {"peer": 4})
 	], {"service": "fc", "env": "prod", "host": "eu-1"}).get_string_from_utf8()
 
 	var lines: PackedStringArray = body.split("\n", false)
@@ -333,16 +333,16 @@ func _test_format_sentry() -> void:
 	_check("the breadcrumbs are attached", (payload["breadcrumbs"] as Dictionary).has("values") and ((payload["breadcrumbs"] as Dictionary)["values"] as Array).size() == 1)
 	_check("the tags do not repeat the first-class fields", not (payload["tags"] as Dictionary).has("env"))
 
-	var unicode_body: String = format.build([_event(DotLog.Level.ERROR, "chat", "ünïcödé broke")], {}).get_string_from_utf8()
+	var unicode_body: String = format.build([_event(GSLog.Level.ERROR, "chat", "ünïcödé broke")], {}).get_string_from_utf8()
 	var unicode_lines: PackedStringArray = unicode_body.split("\n", false)
 	_check("a non-ASCII payload still has a byte-correct length", int((_parse(unicode_lines[1]) as Dictionary)["length"]) == unicode_lines[2].to_utf8_buffer().size())
 
-	var limited: DotResult = format.interpret({"status": 429, "headers": {"Retry-After": "30"}, "body_text": ""})
-	_check("a 429 is a rate limit", limited.code() == DotError.CODE_RATE_LIMITED)
+	var limited: GSResult = format.interpret({"status": 429, "headers": {"Retry-After": "30"}, "body_text": ""})
+	_check("a 429 is a rate limit", limited.code() == GSError.CODE_RATE_LIMITED)
 	_check("and carries the wait", limited.error.retry_after == 30.0)
 	_check("a 413 explains itself", format.interpret({"status": 413, "body_text": ""}).error.detail.contains("breadcrumbs"))
 
-	var no_dsn: DotLogFormatSentry = DotLogFormatSentry.new()
+	var no_dsn: GSLogFormatSentry = GSLogFormatSentry.new()
 	_check("without a DSN there is no endpoint", no_dsn.endpoint_override() == "")
 
 	_line("")

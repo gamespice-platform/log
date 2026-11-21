@@ -1,9 +1,9 @@
 @tool
-class_name DotLogSqlSchema
+class_name GSLogSqlSchema
 extends RefCounted
 
 ## The table a log goes into, and the statements that put it there.
-## Apart from [DotLogTargetSql] so the DDL, the multi-row insert and the column mapping test without a database.
+## Apart from [GSLogTargetSql] so the DDL, the multi-row insert and the column mapping test without a database.
 ## Narrow: six indexed columns plus one JSON blob, and every statement is parameterised (a log message is attacker-influenced).
 
 ## Which SQL to speak. The differences are small and all three matter.
@@ -74,7 +74,7 @@ static func insert_statement(
 	var t: String = quote_identifier(table, dialect)
 	var params: Array = []
 	var rows: PackedStringArray = PackedStringArray()
-	var context_json: String = JSON.stringify(DotLogEvent.json_fields(context))
+	var context_json: String = JSON.stringify(GSLogEvent.json_fields(context))
 
 	var n: int = 0
 	for event: Dictionary in events:
@@ -84,13 +84,13 @@ static func insert_statement(
 			placeholders.append(placeholder(n, dialect))
 		rows.append("(" + ", ".join(placeholders) + ")")
 
-		params.append(DotLogEvent.time_ms(event))
+		params.append(GSLogEvent.time_ms(event))
 		params.append(int(event.get("seq", 0)))
-		params.append(int(event.get("level", DotLog.Level.INFO)))
+		params.append(int(event.get("level", GSLog.Level.INFO)))
 		params.append(String(event.get("level_name", "INFO")))
 		params.append(String(event.get("channel", "")))
 		params.append(String(event.get("message", "")))
-		params.append(JSON.stringify(DotLogEvent.json_fields(event.get("fields", {}))))
+		params.append(JSON.stringify(GSLogEvent.json_fields(event.get("fields", {}))))
 		params.append(context_json)
 
 	return {

@@ -1,8 +1,8 @@
 @tool
-class_name DotLogFormatGelf
-extends DotLogFormat
+class_name GSLogFormatGelf
+extends GSLogFormat
 
-## GELF (Graylog Extended Log Format) over HTTP; UDP chunking is deliberately not implemented, use [DotLogTargetSyslog].
+## GELF (Graylog Extended Log Format) over HTTP; UDP chunking is deliberately not implemented, use [GSLogTargetSyslog].
 ## Spec rules that fail quietly: custom fields start with an underscore, [code]_id[/code] is forbidden, [code]short_message[/code] is required,
 ## [code]timestamp[/code] is seconds with a fraction.
 
@@ -63,23 +63,23 @@ func message_for(event: Dictionary, context: Dictionary) -> Dictionary:
 		"version": "1.1",
 		"host": _host_for(context),
 		"short_message": message,
-		"timestamp": DotLogEvent.time_sec(event),
-		"level": DotLogEvent.syslog_severity(int(event.get("level", DotLog.Level.INFO))),
+		"timestamp": GSLogEvent.time_sec(event),
+		"level": GSLogEvent.syslog_severity(int(event.get("level", GSLog.Level.INFO))),
 		"_channel": String(event.get("channel", "")),
 		"_level_name": String(event.get("severity", "info")),
 	}
 
 	if include_full_message:
-		out["full_message"] = DotLogEvent.text_line(event)
+		out["full_message"] = GSLogEvent.text_line(event)
 
 	for k: Variant in context:
 		if str(k) == "host":
 			continue
-		out[_field_name(str(k))] = DotLogEvent.json_value(context[k])
+		out[_field_name(str(k))] = GSLogEvent.json_value(context[k])
 
 	var fields: Dictionary = event.get("fields", {})
 	for k: Variant in fields:
-		out[_field_name(str(k))] = DotLogEvent.json_value(fields[k])
+		out[_field_name(str(k))] = GSLogEvent.json_value(fields[k])
 
 	return out
 
@@ -113,19 +113,19 @@ func max_bytes() -> int:
 	return 4 * 1024 * 1024
 
 
-func interpret(response: Dictionary) -> DotResult:
+func interpret(response: Dictionary) -> GSResult:
 	var status: int = int(response.get("status", 0))
 	if status >= 200 and status < 300:
-		return DotResult.success(null)
+		return GSResult.success(null)
 
 	if status == 400:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"The GELF input refused the message.",
 			"a missing short_message or a reserved field name will do this: "
 			+ String(response.get("body_text", "")).substr(0, 256)
 		)
 
-	return DotResult.failure(
-		DotError.from_http(status, String(response.get("body_text", "")))
+	return GSResult.failure(
+		GSError.from_http(status, String(response.get("body_text", "")))
 	)
