@@ -65,7 +65,7 @@ static func from_record(record: Dictionary) -> Dictionary:
 		"level": level,
 		"level_name": String(record.get("level_name", GSLog.level_name(level))),
 		"severity": severity_name(level),
-		"channel": GSLog.display_channel(String(record.get("channel", ""))),
+		"channel": String(record.get("channel", "")),
 		"message": String(record.get("message", "")),
 		"fields": record.get("fields", {}),
 		"ticks_ms": ticks,

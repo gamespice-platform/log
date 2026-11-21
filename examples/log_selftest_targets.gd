@@ -139,17 +139,17 @@ func _test_syslog_format() -> void:
 func _test_sql_target() -> void:
 	_section("sql target")
 
-	_check("the schema quotes an identifier", GSLogSqlSchema.quote_identifier("dot_log", GSLogSqlSchema.Dialect.SQLITE) == "\"dot_log\"")
+	_check("the schema quotes an identifier", GSLogSqlSchema.quote_identifier("gs_log", GSLogSqlSchema.Dialect.SQLITE) == "\"gs_log\"")
 	_check("and refuses one it cannot quote", not GSLogSqlSchema.quote_identifier("a\"b; DROP", GSLogSqlSchema.Dialect.SQLITE).contains("DROP;"))
 	_check("mysql uses backticks", GSLogSqlSchema.quote_identifier("t", GSLogSqlSchema.Dialect.MYSQL) == "`t`")
 	_check("postgres numbers its placeholders", GSLogSqlSchema.placeholder(3, GSLogSqlSchema.Dialect.POSTGRES) == "$3")
 	_check("sqlite does not", GSLogSqlSchema.placeholder(3, GSLogSqlSchema.Dialect.SQLITE) == "?")
 
-	var ddl: PackedStringArray = GSLogSqlSchema.create_statements("dot_log", GSLogSqlSchema.Dialect.SQLITE)
+	var ddl: PackedStringArray = GSLogSqlSchema.create_statements("gs_log", GSLogSqlSchema.Dialect.SQLITE)
 	_check("the DDL is a table and two indexes", ddl.size() == 3, null, str(ddl.size()))
 	_check("and is idempotent", ddl[0].contains("IF NOT EXISTS"))
 
-	var pg: PackedStringArray = GSLogSqlSchema.create_statements("dot_log", GSLogSqlSchema.Dialect.POSTGRES)
+	var pg: PackedStringArray = GSLogSqlSchema.create_statements("gs_log", GSLogSqlSchema.Dialect.POSTGRES)
 	_check("postgres gets a JSON column type", pg[0].contains("JSONB"))
 
 	# The level is a sortable column, twice over: a number to order and compare by, and
@@ -161,7 +161,7 @@ func _test_sql_target() -> void:
 	_check("indexed with the channel, which is how it is queried", ddl[2].contains("(channel, level)"), null, ddl[2])
 
 	var events: Array = [_event(GSLog.Level.WARN, "net", "one"), _event(GSLog.Level.INFO, "net", "two")]
-	var insert: Dictionary = GSLogSqlSchema.insert_statement("dot_log", GSLogSqlSchema.Dialect.SQLITE, events, {"service": "fc"})
+	var insert: Dictionary = GSLogSqlSchema.insert_statement("gs_log", GSLogSqlSchema.Dialect.SQLITE, events, {"service": "fc"})
 	_check("one statement covers the batch", str(insert["sql"]).begins_with("INSERT INTO") and str(insert["sql"]).count("(?") == 2)
 	_check("with a parameter per column per row", (insert["params"] as Array).size() == GSLogSqlSchema.COLUMNS.size() * 2)
 	_check("the message is a parameter, never inline", not str(insert["sql"]).contains("one"))
@@ -171,14 +171,14 @@ func _test_sql_target() -> void:
 	_check("so ORDER BY level is severity order", int(bound[2]) > int(bound[2 + GSLogSqlSchema.COLUMNS.size()]), null, "WARN then INFO")
 	_check("and the context is JSON", str((insert["params"] as Array)[7]).contains("fc"))
 
-	var prune: Dictionary = GSLogSqlSchema.prune_statement("dot_log", GSLogSqlSchema.Dialect.SQLITE, 1000)
+	var prune: Dictionary = GSLogSqlSchema.prune_statement("gs_log", GSLogSqlSchema.Dialect.SQLITE, 1000)
 	_check("pruning is a parameterised delete", str(prune["sql"]).begins_with("DELETE FROM") and int((prune["params"] as Array)[0]) == 1000)
 
-	var tail: Dictionary = GSLogSqlSchema.tail_statement("dot_log", GSLogSqlSchema.Dialect.SQLITE, 10, "net")
+	var tail: Dictionary = GSLogSqlSchema.tail_statement("gs_log", GSLogSqlSchema.Dialect.SQLITE, 10, "net")
 	_check("a tail filters and limits", str(tail["sql"]).contains("WHERE channel") and (tail["params"] as Array).size() == 2)
 
 	var driver: FakeDriver = FakeDriver.new()
-	var sql: GSLogTargetSql = GSLogTargetSql.new(driver, "dot_log")
+	var sql: GSLogTargetSql = GSLogTargetSql.new(driver, "gs_log")
 	var opened: GSResult = await sql.open()
 	_check("the target opens against a driver", opened.ok, opened)
 	_check("creating the table", driver.statements.size() == 3)

@@ -9,7 +9,7 @@ extends GSLogTarget
 const SELF_CHANNEL := "log.sql"
 
 ## Table name. Quoted, and anything unquotable is replaced rather than escaped.
-@export var table: String = "dot_log"
+@export var table: String = "gs_log"
 
 ## Which SQL to speak. Ask the driver if it says, and set it here if it does not.
 @export var dialect: GSLogSqlSchema.Dialect = GSLogSqlSchema.Dialect.SQLITE

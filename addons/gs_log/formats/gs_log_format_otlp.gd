@@ -8,11 +8,11 @@ extends GSLogFormat
 
 ## The [code]service.name[/code] resource attribute. Overridden by the router context.
 ## A collector with no service name groups everything under [code]unknown_service[/code].
-@export var service_name: String = "dot-server"
+@export var service_name: String = "gs-server"
 
 ## The instrumentation scope name, which is how a backend tells our records from the ones
 ## an agent on the same host produced.
-@export var scope_name: String = "dot-log"
+@export var scope_name: String = "gs-log"
 
 ## Send [member token] as a bearer credential. Some collectors want a different header;
 ## put it in [member extra_headers] instead.

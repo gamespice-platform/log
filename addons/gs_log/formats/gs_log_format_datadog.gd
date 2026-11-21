@@ -10,7 +10,7 @@ extends GSLogFormat
 @export var ddsource: String = "dot"
 
 ## The [code]service[/code] attribute. Overridden by a `service` in the router context.
-@export var service: String = "dot-server"
+@export var service: String = "gs-server"
 
 ## Fixed tags, as [code]key: value[/code]. Joined into ddtags with the context.
 @export var tags: Dictionary = {}

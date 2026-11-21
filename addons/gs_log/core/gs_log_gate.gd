@@ -140,7 +140,7 @@ func _close_window(entry: Dictionary) -> void:
 		{
 			"repeated": count,
 			"over": "%.1fs" % elapsed,
-			"suppressed_by": "dot-log",
+			"suppressed_by": "gs-log",
 		}
 	))
 
@@ -155,7 +155,7 @@ func _channel_allowed(channel: String) -> bool:
 
 func _matches(channel: String, list: PackedStringArray) -> bool:
 	for listed: String in list:
-		var pattern := GSLog.display_channel(listed)
+		var pattern := listed
 		if pattern == channel:
 			return true
 		if pattern.ends_with("*") and channel.begins_with(pattern.substr(0, pattern.length() - 1)):

@@ -63,7 +63,7 @@ func headers() -> Dictionary:
 	# it is what appears in the SDK column, and an unrecognised one is how you find out
 	# these events came from the game rather than from a web front end.
 	out["X-Sentry-Auth"] = (
-		"Sentry sentry_version=7, sentry_client=dot-log/0.1.0, sentry_key=%s"
+		"Sentry sentry_version=7, sentry_client=gs-log/0.1.0, sentry_key=%s"
 		% parts["key"]
 	)
 	return out

@@ -1,6 +1,6 @@
 # Design
 
-What dot-log is in relation to dot-core's `GSLog`, what the levels mean operationally, and the decisions in the pipeline worth not reversing. How it reaches a server and its console is [wiring.md](wiring.md); the bugs are [history.md](history.md).
+What gs-log is in relation to gs-core's `GSLog`, what the levels mean operationally, and the decisions in the pipeline worth not reversing. How it reaches a server and its console is [wiring.md](wiring.md); the bugs are [history.md](history.md).
 
 ## The split with GameSpice Core, and why it is where it is
 
@@ -10,7 +10,7 @@ GameSpice Log is the back half: it registers one sink and owns everything downst
 
 Two things do live in GameSpice Core and look like duplication:
 
-- **`GSLogSink`** is a small rotating file sink. It stays. A project with no dependency but dot-core needs a log file, and `GSLogTargetFile` is not available to it. dot-log's file target is a superset (per-target gate, JSON lines, daily rotation, the router's context) and it participates in the pipeline. Deliberate duplication, per the family rule.
+- **`GSLogSink`** is a small rotating file sink. It stays. A project with no dependency but gs-core needs a log file, and `GSLogTargetFile` is not available to it. gs-log's file target is a superset (per-target gate, JSON lines, daily rotation, the router's context) and it participates in the pipeline. Deliberate duplication, per the family rule.
 - **`GSLog.mirror_min_level`**, below.
 
 ## The stack-trace problem, and what fixed it
@@ -89,7 +89,7 @@ The suite has a `LoudTarget` that does the forbidden thing on purpose. If that c
 
 **`GSLogTargetHttp` behaviours.** One request at a time, because two concurrent requests from one queue arrive out of order and every collector orders by the timestamp carried. The circuit opens after `failures_before_open` failures for `open_circuit_sec`: a collector that is down stays down for minutes, and retrying every two seconds turns one outage into a second one. A rejected batch is dropped and a failed one kept (see `_worth_retrying`). HTTP is the only transport a browser has.
 
-**Buffered files and rotation.** A flush per line is a system call per line and an IndexedDB transaction per line on web, so lines go out on the router's flush and `flush_on_error` narrows the loss for the lines that matter. Rotation opens a new file rather than renaming an open one (Windows refuses, and behaviour differs on each target); the sortable name keeps a directory listing chronological. dot-core's `GSLogSink` is the smaller version for a project with no dependency but dot-core.
+**Buffered files and rotation.** A flush per line is a system call per line and an IndexedDB transaction per line on web, so lines go out on the router's flush and `flush_on_error` narrows the loss for the lines that matter. Rotation opens a new file rather than renaming an open one (Windows refuses, and behaviour differs on each target); the sortable name keeps a directory listing chronological. gs-core's `GSLogSink` is the smaller version for a project with no dependency but gs-core.
 
 **Syslog.** It is already there on every Linux box: no agent, key or account. UDP cannot block the game and cannot tell you the collector is gone, so it is sent as the record arrives. TCP is octet-counted (RFC 6587), ordered and reports a dead collector, at the cost of a connection, so it is buffered and sent on flush.
 

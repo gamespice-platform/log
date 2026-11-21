@@ -246,7 +246,7 @@ func _make_http() -> GSHttp:
 	http.name = "LogHttp%d" % (_http_nodes.size() + 1)
 	# The user agent is how a collector's operator identifies what is filling their
 	# quota, which is a question they do ask.
-	http.user_agent = "dot-log/0.1 (Godot)"
+	http.user_agent = "gs-log/0.1 (Godot)"
 	add_child(http)
 	_http_nodes.append(http)
 	return http

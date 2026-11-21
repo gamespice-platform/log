@@ -75,7 +75,7 @@ func _test_format_elastic() -> void:
 	_section("format: elasticsearch")
 
 	var format: GSLogFormatElastic = GSLogFormatElastic.new()
-	format.index = "dot-logs-%Y.%m.%d"
+	format.index = "gs-logs-%Y.%m.%d"
 	format.token = "k"
 
 	var body: String = format.build([_event(GSLog.Level.WARN, "net", "one", {"peer": 4})], {"service": "fc"}).get_string_from_utf8()
@@ -84,7 +84,7 @@ func _test_format_elastic() -> void:
 
 	var action: Dictionary = _parse(lines[0])
 	_check("the action is index by default", action.has("index"))
-	_check("naming the resolved index", str((action["index"] as Dictionary)["_index"]).begins_with("dot-logs-2"), null, str((action["index"] as Dictionary)["_index"]))
+	_check("naming the resolved index", str((action["index"] as Dictionary)["_index"]).begins_with("gs-logs-2"), null, str((action["index"] as Dictionary)["_index"]))
 	_check("the date pattern is expanded", not str((action["index"] as Dictionary)["_index"]).contains("%"))
 
 	var doc: Dictionary = _parse(lines[1])
@@ -301,7 +301,7 @@ func _test_format_sentry() -> void:
 	_check("it is an error tracker, not a log collector", format.is_error_tracker())
 	_check("the endpoint comes from the DSN", format.endpoint_override() == "https://o1.ingest.example.com/api/4505/envelope/", null, format.endpoint_override())
 	_check("the auth header carries the public key", str(format.headers()["X-Sentry-Auth"]).contains("sentry_key=abc123"))
-	_check("and names the client", str(format.headers()["X-Sentry-Auth"]).contains("dot-log"))
+	_check("and names the client", str(format.headers()["X-Sentry-Auth"]).contains("gs-log"))
 
 	var memory: GSLogTargetMemory = GSLogTargetMemory.new(8)
 	memory.open()

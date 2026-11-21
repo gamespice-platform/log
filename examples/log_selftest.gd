@@ -1,6 +1,6 @@
 extends "log_selftest_targets.gd"
 
-## Exercises dot-log without a collector, a database or a socket.
+## Exercises gs-log without a collector, a database or a socket.
 ## Covers the bytes, the gate, the buffer and each target's failure path; the HTTP and SQL seams are faked one level above themselves.
 ## Run: [code]godot --headless --path . res://examples/log_selftest.tscn[/code]
 
@@ -11,7 +11,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	_line("dot-log self-test")
+	_line("gs-log self-test")
 	_line("")
 	# Two engine errors below are produced ON PURPOSE, by the checks that a bad
 	# redaction pattern and a non-JSON collector response are reported rather than
@@ -64,9 +64,6 @@ func _test_event() -> void:
 
 	var second: Dictionary = GSLogEvent.from_record(record)
 	_check("the sequence advances", int(second["seq"]) > int(event["seq"]))
-
-	var legacy: Dictionary = GSLogEvent.from_record(_record(GSLog.Level.INFO, "dot.content.index"))
-	_check("a legacy dot channel ships as gs", str(legacy["channel"]) == "gs.content.index", null, str(legacy["channel"]))
 
 	_check("the record it came from is untouched", not record.has("time_ms"))
 
@@ -218,11 +215,6 @@ func _test_gate() -> void:
 	channelled.deny_channels = PackedStringArray(["net"])
 	_check("a deny beats an allow", not channelled.allows(_event(GSLog.Level.INFO, "net")))
 
-	var renamed: GSLogGate = GSLogGate.new()
-	renamed.channels = PackedStringArray(["dot.bot*", "gs.cloud"])
-	_check("an old dot pattern matches the gs channel", renamed.allows(_event(GSLog.Level.INFO, "dot.bot.nav")))
-	_check("a gs pattern matches a channel still named dot", renamed.allows(_event(GSLog.Level.INFO, "dot.cloud")))
-
 	var sampled: GSLogGate = GSLogGate.new()
 	sampled.trace_sample = 0.0
 	_check("sampling at zero keeps nothing", not sampled.allows(_event(GSLog.Level.TRACE)))
@@ -287,7 +279,7 @@ func _test_gate_dedupe() -> void:
 	var summaries: Array[Dictionary] = gate.drain_summaries()
 	_check("a closed window produces one summary", summaries.size() >= 1, null, str(summaries.size()))
 	_check("naming how many were suppressed", int(summaries[0]["fields"]["repeated"]) == 49, null, str(summaries[0]["fields"]["repeated"]))
-	_check("and saying who suppressed them", str(summaries[0]["fields"]["suppressed_by"]) == "dot-log")
+	_check("and saying who suppressed them", str(summaries[0]["fields"]["suppressed_by"]) == "gs-log")
 	_check("keeping the original message", str(summaries[0]["message"]) == "packet refused")
 	_check("draining twice gives nothing", gate.drain_summaries().is_empty())
 

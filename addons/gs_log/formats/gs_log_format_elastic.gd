@@ -7,9 +7,9 @@ extends GSLogFormat
 ## Field names are prefixed by default: a type conflict between addons logging the same name makes one unindexable.
 
 ## Index to write to. A date pattern is expanded: [code]%Y[/code], [code]%m[/code],
-## [code]%d[/code] — so [code]dot-logs-%Y.%m.%d[/code] gives a daily index, which is how
+## [code]%d[/code] — so [code]gs-logs-%Y.%m.%d[/code] gives a daily index, which is how
 ## retention is done here (drop the old index; deleting rows is far more expensive).
-@export var index: String = "dot-logs-%Y.%m.%d"
+@export var index: String = "gs-logs-%Y.%m.%d"
 
 ## Use a data stream instead of an index.
 ## A data stream accepts only [code]create[/code], never [code]index[/code], and rejects the whole request otherwise.

@@ -10,7 +10,7 @@ extends GSLogFormat
 @export var splunk_index: String = ""
 
 ## The [code]source[/code] field, conventionally the thing that produced the record.
-@export var source: String = "dot-server"
+@export var source: String = "gs-server"
 
 ## The [code]sourcetype[/code], which Splunk's field extraction keys off.
 ## [code]_json[/code] parses the event object's fields with no Splunk-side configuration.

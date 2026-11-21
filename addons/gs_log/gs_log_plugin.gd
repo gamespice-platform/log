@@ -4,13 +4,13 @@ extends EditorPlugin
 ## Editor entry point for GameSpice Log. Registers the router as an inspector type.
 ## No autoload: a server and a client in one process need two routers. Only the [Node] is registered; Resources already appear in typed slots.
 
-const _ICON := "res://addons/dot_log/icon_placeholder.svg"
+const _ICON := "res://addons/gs_log/icon_placeholder.svg"
 
 const _TYPES := [
 	[
 		"GSLogRouter",
 		"Node",
-		"res://addons/dot_log/runtime/dot_log_router.gd",
+		"res://addons/gs_log/runtime/gs_log_router.gd",
 	],
 ]
 

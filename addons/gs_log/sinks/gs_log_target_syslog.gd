@@ -29,7 +29,7 @@ const SD_ID := "dot@32473"
 @export var transport: Transport = Transport.UDP
 
 ## The APP-NAME field: which program on the host this is. Collectors index on it.
-@export var app_name: String = "dot-server"
+@export var app_name: String = "gs-server"
 
 ## The HOSTNAME field. Empty asks the OS, which is right nearly always.
 @export var host_name: String = ""

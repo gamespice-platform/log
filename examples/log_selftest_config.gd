@@ -46,7 +46,7 @@ func _test_config() -> void:
 	config.sql_enabled = false
 
 	_check("the secrets are named", config.sensitive_keys().has("remote_token") and config.sensitive_keys().has("sentry_dsn"))
-	_check("the env prefix is the family's shape", config.env_prefix() == "DOT_LOG_")
+	_check("the env prefix is the family's shape", config.env_prefix() == "GS_LOG_")
 	_check("and so is the cli prefix", config.cli_prefix() == "--log-")
 
 	var applied: PackedStringArray = config.apply_dictionary({
@@ -81,11 +81,11 @@ func _test_config() -> void:
 
 
 func _test_cfg_layout() -> void:
-	_section("log.yml: cfg/addons/dot_log wins over the flat file, cfg/server/addons/dot_log wins over both")
+	_section("log.yml: cfg/addons/gs_log wins over the flat file, cfg/server/addons/gs_log wins over both")
 
-	var legacy := "user://dot_log_selftest_legacy"
-	var addon_dir := "user://cfg/addons/dot_log"
-	var server_dir := "user://cfg/server/addons/dot_log"
+	var legacy := "user://gs_log_selftest_legacy"
+	var addon_dir := "user://cfg/addons/gs_log"
+	var server_dir := "user://cfg/server/addons/gs_log"
 	GSPaths.remove_tree(addon_dir)
 	GSPaths.remove_tree(server_dir)
 	GSPaths.remove_tree(legacy)
@@ -111,8 +111,8 @@ func _test_cfg_layout() -> void:
 	_check("the operator's server layer wins", res.ok and config.level == "error", res)
 	_check("a secret in a file is read", config.remote_token == "abc")
 
-	var game_dir := "user://cfg/game/mg-test/dot_log"
-	var server_game_dir := "user://cfg/server/game/mg-test/dot_log"
+	var game_dir := "user://cfg/game/mg-test/gs_log"
+	var server_game_dir := "user://cfg/server/game/mg-test/gs_log"
 	GSAddonConfig.game = "mg-test"
 	_write_text(game_dir.path_join("log.yml"), "level: trace\n")
 	config = GSLogConfig.new()
@@ -134,12 +134,12 @@ func _test_cfg_layout() -> void:
 	GSPaths.remove_tree(server_dir)
 	GSPaths.remove_tree(legacy)
 	GSCfgLegacy.reset()
-	_write_text("user://cfg/server/dot_log/log.yml", "level: info\n")
+	_write_text("user://cfg/server/gs_log/log.yml", "level: info\n")
 	config = GSLogConfig.new()
 	res = config.load_cfg("log.yml", legacy)
-	_check("the old cfg/server/dot_log/ still loads", res.ok and config.level == "info", res)
+	_check("the old cfg/server/gs_log/ still loads", res.ok and config.level == "info", res)
 	_check("and warns once", GSCfgLegacy.warned_count() == 1)
-	GSPaths.remove_tree("user://cfg/server/dot_log")
+	GSPaths.remove_tree("user://cfg/server/gs_log")
 	GSPaths.remove_tree(server_dir)
 	GSPaths.remove_tree(legacy)
 	GSCfgLegacy.reset()
@@ -246,7 +246,7 @@ func _test_levels() -> void:
 	_check("severity_name is the collectors' spelling", GSLogEvent.severity_name(GSLog.Level.WARN) == "warning")
 
 	var json: Dictionary = _parse(GSLog.format_json(_record(GSLog.Level.WARN, "net", "x")))
-	_check("dot-core's JSON has the name", str(json["level"]) == "WARN")
+	_check("gs-core's JSON has the name", str(json["level"]) == "WARN")
 	_check("and the number, because a string sorts wrong", int(json["severity"]) == GSLog.Level.WARN)
 
 	# GSLog.at, for a level that is data rather than a call site.

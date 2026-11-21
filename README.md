@@ -1,6 +1,6 @@
 [![Log - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/59-gs-log)
 
-Where your game's log lines go. Every [**GameSpice**](https://gamespice.net) addon already writes through `GSLog` (from [GameSpice Core](https://github.com/gamespice-platform/core)); dot-log decides what happens to those records next: a rotating file, a memory ring, syslog, a database table or a hosted log service. It also filters, hides secrets, collapses floods and batches, once, in front of every destination. Part of TMC's open source **GameSpice** collection (MIT licence).
+Where your game's log lines go. Every [**GameSpice**](https://gamespice.net) addon already writes through `GSLog` (from [GameSpice Core](https://github.com/gamespice-platform/core)); gs-log decides what happens to those records next: a rotating file, a memory ring, syslog, a database table or a hosted log service. It also filters, hides secrets, collapses floods and batches, once, in front of every destination. Part of TMC's open source **GameSpice** collection (MIT licence).
 
 > Built with Claude Code. Every addon has a headless test suite and the suites pass, but little of this has met real players yet. Please report rough edges.
 
@@ -8,7 +8,7 @@ Where your game's log lines go. Every [**GameSpice**](https://gamespice.net) add
 
 ## Install
 
-Copy `addons/dot_log/` and dot-core's `addons/dot_core/` into your project and enable dot-log under **Project > Project Settings > Plugins**. There is no autoload: you create a `GSLogRouter` where you want one.
+Copy `addons/gs_log/` and gs-core's `addons/gs_core/` into your project and enable gs-log under **Project > Project Settings > Plugins**. There is no autoload: you create a `GSLogRouter` where you want one.
 
 ## Quick start
 
@@ -107,7 +107,7 @@ A new format is one small file: build the body, name the path and header, say wh
 
 ## Settings
 
-`GSLogConfig` is layered like every GameSpice config: defaults, JSON file, `DOT_LOG_*` environment, `--log-*` command line. `remote_token` and `sentry_dsn` are accepted from the file only, never from the environment or command line.
+`GSLogConfig` is layered like every GameSpice config: defaults, JSON file, `GS_LOG_*` environment, `--log-*` command line. `remote_token` and `sentry_dsn` are accepted from the file only, never from the environment or command line.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
@@ -133,7 +133,7 @@ A new format is one small file: build the body, name the path and header, say wh
 | `remote_level`, `remote_batch` | `info`, 100 | Lowest level and records per request. |
 | `remote_tags` | none | Extra labels. |
 | `sql_enabled` | false | Write to a database. |
-| `sql_table`, `sql_dialect` | `dot_log`, `sqlite` | Table and SQL flavour. |
+| `sql_table`, `sql_dialect` | `gs_log`, `sqlite` | Table and SQL flavour. |
 | `sql_level`, `sql_retention_days` | `info`, 30 | Lowest level and how long rows are kept. |
 | `redact_enabled` | true | Hide secrets. |
 | `redact_ips`, `redact_emails` | false, true | Also hide IP addresses and email addresses. |
@@ -146,8 +146,8 @@ A new format is one small file: build the body, name the path and header, say wh
 `GSLogCommands` is a console command that works with a client or server console without GameSpice Log depending on either:
 
 ```gdscript
-console.add_source(GSConsoleBridge.wrap(GSLogCommands.new(router), "log"))      # dot-console
-server.console.add_source(GSLogCommands.new(router), GSAdminFlags.GENERIC)       # dot-server
+console.add_source(GSConsoleBridge.wrap(GSLogCommands.new(router), "log"))      # gs-console
+server.console.add_source(GSLogCommands.new(router), GSAdminFlags.GENERIC)       # gs-server
 ```
 
 | Command | Does |

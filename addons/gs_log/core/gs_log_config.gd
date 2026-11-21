@@ -3,7 +3,7 @@ class_name GSLogConfig
 extends GSConfig
 
 ## Logging as a deployment document: one flat file that builds the whole pipeline.
-## Layered like every [GSConfig]: defaults, JSON file, [code]DOT_LOG_*[/code] environment, [code]--log-*[/code] command line.
+## Layered like every [GSConfig]: defaults, JSON file, [code]GS_LOG_*[/code] environment, [code]--log-*[/code] command line.
 ## [member remote_token] and [member sentry_dsn] are refused from environment and command line (see docs/design.md).
 
 ## The named levels, for the string-valued settings.
@@ -11,8 +11,8 @@ const LEVEL_KEYS: Array[String] = [
 	"trace", "debug", "info", "warn", "error", "fatal", "off",
 ]
 
-## The addon name [GSAddonConfig] turns into the folder `dot_log`.
-const CFG_ADDON := "dot-log"
+## The addon name [GSAddonConfig] turns into the folder `gs_log`.
+const CFG_ADDON := "gs-log"
 
 @export_group("Levels")
 
@@ -88,7 +88,7 @@ const CFG_ADDON := "dot-log"
 ## Use TCP with octet-counted framing instead of UDP datagrams.
 @export var syslog_tcp: bool = false
 
-@export var syslog_app: String = "dot-server"
+@export var syslog_app: String = "gs-server"
 
 @export var syslog_level: String = "info"
 
@@ -124,7 +124,7 @@ const CFG_ADDON := "dot-log"
 
 @export var sql_enabled: bool = false
 
-@export var sql_table: String = "dot_log"
+@export var sql_table: String = "gs_log"
 
 ## sqlite, postgres or mysql.
 @export var sql_dialect: String = "sqlite"
@@ -155,7 +155,7 @@ const CFG_ADDON := "dot-log"
 
 
 func env_prefix() -> String:
-	return "DOT_LOG_"
+	return "GS_LOG_"
 
 
 func cli_prefix() -> String:
@@ -166,14 +166,14 @@ func sensitive_keys() -> PackedStringArray:
 	return PackedStringArray(["remote_token", "sentry_dsn"])
 
 
-## Applies [param file_name] from `cfg/addons/dot_log/`, then the operator's `cfg/server/addons/dot_log/`.
+## Applies [param file_name] from `cfg/addons/gs_log/`, then the operator's `cfg/server/addons/gs_log/`.
 ## A flat [param legacy_dir]/[param file_name] is still read (one WARN) while no new copy exists.
 ## Secrets stay file-only: the environment and command line still refuse them.
 func apply_cfg_file(file_name: String = "log.yml", legacy_dir: String = "res://cfg") -> GSResult:
 	return GSAddonConfig.apply_file(CFG_ADDON, file_name, legacy_dir, apply_dictionary)
 
 
-## [method apply_cfg_file], then `DOT_LOG_*`, `--log-*` and validation: [method GSConfig.load_layered] for the yml layout.
+## [method apply_cfg_file], then `GS_LOG_*`, `--log-*` and validation: [method GSConfig.load_layered] for the yml layout.
 func load_cfg(file_name: String = "log.yml", legacy_dir: String = "res://cfg") -> GSResult:
 	unknown_keys = PackedStringArray()
 	var file_res := apply_cfg_file(file_name, legacy_dir)
