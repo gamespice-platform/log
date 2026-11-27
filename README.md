@@ -2,7 +2,7 @@
 
 Where your game's log lines go. Every [**GameSpice**](https://gamespice.net) addon already writes through `GSLog` (from [GameSpice Core](https://github.com/gamespice-platform/core)); gs-log decides what happens to those records next: a rotating file, a memory ring, syslog, a database table or a hosted log service. It also filters, hides secrets, collapses floods and batches, once, in front of every destination. Part of TMC's open source **GameSpice** collection (MIT licence).
 
-> Built with Claude Code. Every addon has a headless test suite and the suites pass, but little of this has met real players yet. Please report rough edges.
+> gs-log is a [GameSpice](https://gamespice.net) addon, MIT licensed and built with Claude Code. It has a headless suite, `examples/log_selftest.tscn`. The games in [Zee's Games](https://zeesgames.com) are built on the GameSpice addons and run on live servers; none of them routes its logs through this addon yet.
 
 `GSLog` stays the front door and your calls do not change. GameSpice Log plugs in behind it.
 
@@ -177,6 +177,12 @@ godot --headless --path . res://examples/log_selftest.tscn
 ```
 
 The suite uses a fake collector and a fake database driver, so it needs no network.
+
+## Used by
+
+No shipped game uses it yet; the example scene shows it.
+
+The whole collection is at [zeesgames.com](https://zeesgames.com).
 
 ## Licence
 
